@@ -175,6 +175,7 @@ public class NotificationManagerService extends SystemService {
     private final HandlerThread mRankingThread = new HandlerThread("ranker",
             Process.THREAD_PRIORITY_BACKGROUND);
 
+    private Light mButtonLight;
     private Light mNotificationLight;
     Light mAttentionLight;
     private int mDefaultNotificationColor;
@@ -709,8 +710,13 @@ public class NotificationManagerService extends SystemService {
             } else if (action.equals(Intent.ACTION_SCREEN_ON)) {
                 // Keep track of screen on/off state, but do not turn off the notification light
                 // until user passes through the lock screen or views the notification.
+
+                //On Screen on of turn on/off button backlight
+                mButtonLight.setColor(0xFFFFFF);
                 mScreenOn = true;
             } else if (action.equals(Intent.ACTION_SCREEN_OFF)) {
+                //On Screen on of turn on/off button backlight
+                mButtonLight.turnOff();
                 mScreenOn = false;
             } else if (action.equals(TelephonyManager.ACTION_PHONE_STATE_CHANGED)) {
                 mInCall = TelephonyManager.EXTRA_STATE_OFFHOOK
@@ -844,6 +850,7 @@ public class NotificationManagerService extends SystemService {
         mStatusBar.setNotificationDelegate(mNotificationDelegate);
 
         final LightsManager lights = getLocalService(LightsManager.class);
+        mButtonLight = lights.getLight(LightsManager.LIGHT_ID_BUTTONS);
         mNotificationLight = lights.getLight(LightsManager.LIGHT_ID_NOTIFICATIONS);
         mAttentionLight = lights.getLight(LightsManager.LIGHT_ID_ATTENTION);
 
