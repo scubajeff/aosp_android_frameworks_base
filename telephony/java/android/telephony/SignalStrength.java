@@ -303,6 +303,17 @@ public class SignalStrength implements Parcelable {
         ss.mLteRssnr = in.readInt();
         ss.mLteCqi = in.readInt();
 
+        if ((ss.mLteSignalStrength & 0xff) == 255 || ss.mLteSignalStrength== 99) {
+            ss.mLteSignalStrength = 99;
+            ss.mLteRsrp = SignalStrength.INVALID;
+            ss.mLteRsrq = SignalStrength.INVALID;
+            ss.mLteRssnr = SignalStrength.INVALID;
+            ss.mLteCqi = SignalStrength.INVALID;
+        }
+        else {
+            ss.mLteSignalStrength &= 0xff;
+        }
+
         return ss;
     }
 
