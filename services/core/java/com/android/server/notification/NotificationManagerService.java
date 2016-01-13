@@ -238,6 +238,8 @@ public class NotificationManagerService extends SystemService {
     private final HandlerThread mRankingThread = new HandlerThread("ranker",
             Process.THREAD_PRIORITY_BACKGROUND);
 
+    private Light mButtonLight;
+    private Light mColortoneLight;
     private Light mNotificationLight;
     Light mAttentionLight;
     private int mDefaultNotificationColor;
@@ -265,6 +267,9 @@ public class NotificationManagerService extends SystemService {
     private boolean mScreenOn = true;
     private boolean mInCall = false;
     private boolean mNotificationPulseEnabled;
+
+    private boolean mButtonLightEnabled = true;
+    private int mColortoneMode = Settings.System.SCREEN_COLORTONE_AUTO;
 
     // used as a mutex for access to all active notifications & listeners
     final ArrayList<NotificationRecord> mNotificationList =
@@ -762,9 +767,21 @@ public class NotificationManagerService extends SystemService {
             if (action.equals(Intent.ACTION_SCREEN_ON)) {
                 // Keep track of screen on/off state, but do not turn off the notification light
                 // until user passes through the lock screen or views the notification.
+
+                if (mButtonLightEnabled) {
+                    //On Screen on of turn on/off button backlight
+                    mButtonLight.setColor(0xFFFFFF);
+                }
+                else {
+                    //Never turn button backlight on
+                    mButtonLight.turnOff();
+                }
+
                 mScreenOn = true;
                 updateNotificationPulse();
             } else if (action.equals(Intent.ACTION_SCREEN_OFF)) {
+                //On Screen on of turn on/off button backlight
+                mButtonLight.turnOff();
                 mScreenOn = false;
                 updateNotificationPulse();
             } else if (action.equals(TelephonyManager.ACTION_PHONE_STATE_CHANGED)) {
@@ -819,6 +836,10 @@ public class NotificationManagerService extends SystemService {
                 = Settings.System.getUriFor(Settings.System.NOTIFICATION_LIGHT_PULSE);
         private final Uri NOTIFICATION_RATE_LIMIT_URI
                 = Settings.Global.getUriFor(Settings.Global.MAX_NOTIFICATION_ENQUEUE_RATE);
+        private final Uri SCREEN_COLORTONE_URI
+                = Settings.System.getUriFor(Settings.System.SCREEN_COLORTONE);
+        private final Uri BUTTON_LIGHT_URI
+                = Settings.System.getUriFor(Settings.System.BUTTON_LIGHT);
 
         SettingsObserver(Handler handler) {
             super(handler);
@@ -829,6 +850,9 @@ public class NotificationManagerService extends SystemService {
             resolver.registerContentObserver(NOTIFICATION_LIGHT_PULSE_URI,
                     false, this, UserHandle.USER_ALL);
             resolver.registerContentObserver(NOTIFICATION_RATE_LIMIT_URI,
+            resolver.registerContentObserver(BUTTON_LIGHT_URI,
+                    false, this, UserHandle.USER_ALL);
+            resolver.registerContentObserver(SCREEN_COLORTONE_URI,
                     false, this, UserHandle.USER_ALL);
             update(null);
         }
@@ -850,6 +874,29 @@ public class NotificationManagerService extends SystemService {
             if (uri == null || NOTIFICATION_RATE_LIMIT_URI.equals(uri)) {
                 mMaxPackageEnqueueRate = Settings.Global.getFloat(resolver,
                             Settings.Global.MAX_NOTIFICATION_ENQUEUE_RATE, mMaxPackageEnqueueRate);
+            if (uri == null || SCREEN_COLORTONE_URI.equals(uri)) {
+                int colortone = Settings.System.getInt(resolver,
+                            Settings.System.SCREEN_COLORTONE, Settings.System.SCREEN_COLORTONE_AUTO);
+
+                if (mColortoneMode != colortone) {
+                    mColortoneMode = colortone;
+                    mColortoneLight.setBrightness(mColortoneMode);
+                }
+            }
+            if (uri == null || BUTTON_LIGHT_URI.equals(uri)) {
+                boolean buttonLight = Settings.System.getInt(resolver,
+                            Settings.System.BUTTON_LIGHT, Settings.System.BUTTON_LIGHT_ON) == Settings.System.BUTTON_LIGHT_ON;
+
+                if (mButtonLightEnabled != buttonLight) {
+                    mButtonLightEnabled = buttonLight;
+                    if (mButtonLightEnabled) {
+                        //On Screen on of turn on/off button backlight
+                        mButtonLight.setColor(0xFFFFFF);
+                    }
+                    else {
+                        mButtonLight.turnOff();
+                    }
+                }
             }
         }
     }
@@ -978,6 +1025,8 @@ public class NotificationManagerService extends SystemService {
         }
 
         final LightsManager lights = getLocalService(LightsManager.class);
+        mColortoneLight = lights.getLight(LightsManager.LIGHT_ID_COLORTONE);
+        mButtonLight = lights.getLight(LightsManager.LIGHT_ID_BUTTONS);
         mNotificationLight = lights.getLight(LightsManager.LIGHT_ID_NOTIFICATIONS);
         mAttentionLight = lights.getLight(LightsManager.LIGHT_ID_ATTENTION);
 
@@ -1106,6 +1155,16 @@ public class NotificationManagerService extends SystemService {
         if (phase == SystemService.PHASE_SYSTEM_SERVICES_READY) {
             // no beeping until we're basically done booting
             mSystemReady = true;
+
+            if (mButtonLightEnabled) {
+                //On Screen on of turn on/off button backlight
+                mButtonLight.setColor(0xFFFFFF);
+            }
+            else {
+                mButtonLight.turnOff();
+            }
+
+            mColortoneLight.setBrightness(mColortoneMode);
 
             // Grab our optional AudioService
             mAudioManager = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
@@ -2376,6 +2435,8 @@ public class NotificationManagerService extends SystemService {
                     }
                     pw.println("  mUseAttentionLight=" + mUseAttentionLight);
                     pw.println("  mNotificationPulseEnabled=" + mNotificationPulseEnabled);
+                    pw.println("  mButtonLightEnabled=" + mButtonLightEnabled);
+                    pw.println("  mColortoneMode=" + mColortoneMode);
                     pw.println("  mSoundNotificationKey=" + mSoundNotificationKey);
                     pw.println("  mVibrateNotificationKey=" + mVibrateNotificationKey);
                     pw.println("  mDisableNotificationEffects=" + mDisableNotificationEffects);

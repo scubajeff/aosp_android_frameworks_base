@@ -192,6 +192,7 @@ public final class PowerManagerService extends SystemService
     private SettingsObserver mSettingsObserver;
     private DreamManagerInternal mDreamManager;
     private Light mAttentionLight;
+    private Light mColortoneLight;
 
     private final Object mLock = new Object();
 
@@ -409,6 +410,10 @@ public final class PowerManagerService extends SystemService
     // One of the Settings.System.SCREEN_BRIGHTNESS_MODE_* constants.
     private int mScreenBrightnessModeSetting;
 
+    // The screen color mode.
+    // One of the Settings.System.SCREEN_COLORTONE_* constants.
+    private int mScreenColortoneSetting;
+
     // The screen brightness setting override from the window manager
     // to allow the current foreground activity to override the brightness.
     // Use -1 to disable.
@@ -586,6 +591,7 @@ public final class PowerManagerService extends SystemService
 
             mLightsManager = getLocalService(LightsManager.class);
             mAttentionLight = mLightsManager.getLight(LightsManager.LIGHT_ID_ATTENTION);
+            mColortoneLight = mLightsManager.getLight(LightsManager.LIGHT_ID_ATTENTION);
 
             // Initialize display power management.
             mDisplayManagerInternal.initPowerManagement(
@@ -635,6 +641,9 @@ public final class PowerManagerService extends SystemService
                     false, mSettingsObserver, UserHandle.USER_ALL);
             resolver.registerContentObserver(Settings.System.getUriFor(
                     Settings.System.SCREEN_BRIGHTNESS_MODE),
+                    false, mSettingsObserver, UserHandle.USER_ALL);
+            resolver.registerContentObserver(Settings.System.getUriFor(
+                    Settings.System.SCREEN_COLORTONE),
                     false, mSettingsObserver, UserHandle.USER_ALL);
             resolver.registerContentObserver(Settings.System.getUriFor(
                     Settings.System.SCREEN_AUTO_BRIGHTNESS_ADJ),
@@ -769,6 +778,9 @@ public final class PowerManagerService extends SystemService
 
         mBrightnessUseTwilight = Settings.Secure.getIntForUser(resolver,
                 Secure.BRIGHTNESS_USE_TWILIGHT, 0, UserHandle.USER_CURRENT) != 0;
+        mScreenColortoneSetting = Settings.System.getIntForUser(resolver,
+                Settings.System.SCREEN_COLORTONE,
+                Settings.System.SCREEN_COLORTONE_AUTO, UserHandle.USER_CURRENT);
 
         final boolean lowPowerModeEnabled = Settings.Global.getInt(resolver,
                 Settings.Global.LOW_POWER_MODE, 0) != 0;
@@ -2021,6 +2033,8 @@ public final class PowerManagerService extends SystemService
             screenAutoBrightnessAdjustment = Math.max(Math.min(
                     screenAutoBrightnessAdjustment, 1.0f), -1.0f);
 
+            setColortoneLightInternal(mScreenColortoneSetting);
+
             // Update display power request.
             mDisplayPowerRequest.screenBrightness = screenBrightness;
             mDisplayPowerRequest.screenAutoBrightnessAdjustment =
@@ -2571,6 +2585,19 @@ public final class PowerManagerService extends SystemService
         light.setFlashing(color, Light.LIGHT_FLASH_HARDWARE, (on ? 3 : 0), 0);
     }
 
+    private void setColortoneLightInternal(int colortone) {
+        Light light;
+        synchronized (mLock) {
+            if (!mSystemReady) {
+                return;
+            }
+            light = mColortoneLight;
+        }
+
+        // Control light outside of lock.
+        light.setBrightness(colortone);
+    }
+
     private void boostScreenBrightnessInternal(long eventTime, int uid) {
         synchronized (mLock) {
             if (!mSystemReady || mWakefulness == WAKEFULNESS_ASLEEP
@@ -2821,6 +2848,7 @@ public final class PowerManagerService extends SystemService
             pw.println("  mScreenAutoBrightnessAdjustmentSetting="
                     + mScreenAutoBrightnessAdjustmentSetting);
             pw.println("  mScreenBrightnessModeSetting=" + mScreenBrightnessModeSetting);
+            pw.println("  mScreenColortoneSetting=" + mScreenColortoneSetting);
             pw.println("  mScreenBrightnessOverrideFromWindowManager="
                     + mScreenBrightnessOverrideFromWindowManager);
             pw.println("  mUserActivityTimeoutOverrideFromWindowManager="
