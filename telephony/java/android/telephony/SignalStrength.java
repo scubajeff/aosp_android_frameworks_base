@@ -312,7 +312,7 @@ public class SignalStrength implements Parcelable {
         if (DBG) log("Size of signalstrength parcel:" + in.dataSize());
 
         SignalStrength ss = new SignalStrength();
-        ss.mGsmSignalStrength = in.readInt();
+        ss.mGsmSignalStrength = in.readInt() & 0xff;
         ss.mGsmBitErrorRate = in.readInt();
         ss.mCdmaDbm = in.readInt();
         ss.mCdmaEcio = in.readInt();
@@ -324,7 +324,26 @@ public class SignalStrength implements Parcelable {
         ss.mLteRsrq = in.readInt();
         ss.mLteRssnr = in.readInt();
         ss.mLteCqi = in.readInt();
-        ss.mTdScdmaRscp = in.readInt();
+        //ss.mTdScdmaRscp = in.readInt();
+
+        log("gsmSignalStrength:" + ss.mGsmSignalStrength + " gsmBitErrorRate:" + ss.mGsmBitErrorRate +
+            " cdmaDbm:" + ss.mCdmaDbm + " cdmaEcio:" + ss.mCdmaEcio + " evdoDbm:" + ss.mEvdoDbm +
+            " evdoEcio: " + ss.mEvdoEcio + " evdoSnr:" + ss.mEvdoSnr +
+            " lteSignalStrength:" + ss.mLteSignalStrength + " lteRsrp:" + ss.mLteRsrp +
+            " lteRsrq:" + ss.mLteRsrq + " lteRssnr:" + ss.mLteRssnr + " lteCqi:" + ss.mLteCqi +
+            " isGsm:" + (ss.isGsm ? "true" : "false"));
+
+        if ((ss.mLteSignalStrength & 0xff) == 255 || ss.mLteSignalStrength== 99) {
+            ss.mLteSignalStrength = 99;
+            ss.mLteRsrp = SignalStrength.INVALID;
+            ss.mLteRsrq = SignalStrength.INVALID;
+            ss.mLteRssnr = SignalStrength.INVALID;
+            ss.mLteCqi = SignalStrength.INVALID;
+        }
+        else {
+            ss.mLteSignalStrength &= 0xff;
+        }
+
         return ss;
     }
 
