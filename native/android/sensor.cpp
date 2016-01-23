@@ -38,11 +38,6 @@ using android::String8;
 using android::String16;
 
 /*****************************************************************************/
-
-//chagall klimt gpsd needs _ZN7android9SingletonINS_13SensorManagerEE5sLockE
-android::Mutex android::SensorManager::sLock;
-std::map<String16, SensorManager*> android::SensorManager::sPackageInstances;
-
 ASensorManager* ASensorManager_getInstance()
 {
     return ASensorManager_getInstanceForPackage(NULL);
