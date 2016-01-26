@@ -72,6 +72,7 @@ import android.hardware.hdmi.HdmiControlManager;
 import android.hardware.hdmi.HdmiPlaybackClient;
 import android.hardware.hdmi.HdmiPlaybackClient.OneTouchPlayCallback;
 import android.hardware.input.InputManagerInternal;
+import android.hardware.input.InputManager;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.AudioSystem;
@@ -609,6 +610,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     Intent mDeskDockIntent;
     boolean mSearchKeyShortcutPending;
     boolean mConsumeSearchKeyUp;
+    boolean mAppSwitchKeyLongPressed;
     boolean mAssistKeyLongPressed;
     boolean mPendingMetaAction;
     boolean mPendingCapsLockToggle;
@@ -2961,6 +2963,20 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             WindowManager.LayoutParams.TYPE_SYSTEM_ERROR,
         };
 
+    private void triggerVirtualKeypress(final int keyCode) {
+        InputManager im = InputManager.getInstance();
+        long now = SystemClock.uptimeMillis();
+
+        final KeyEvent downEvent = new KeyEvent(now, now, KeyEvent.ACTION_DOWN,
+                keyCode, 0, 0, KeyCharacterMap.VIRTUAL_KEYBOARD, 0,
+                KeyEvent.FLAG_FROM_SYSTEM, InputDevice.SOURCE_KEYBOARD);
+
+        final KeyEvent upEvent = KeyEvent.changeAction(downEvent, KeyEvent.ACTION_UP);
+
+        im.injectInputEvent(downEvent, InputManager.INJECT_INPUT_EVENT_MODE_ASYNC);
+        im.injectInputEvent(upEvent, InputManager.INJECT_INPUT_EVENT_MODE_ASYNC);
+    }
+
     /** {@inheritDoc} */
     @Override
     public long interceptKeyBeforeDispatching(WindowState win, KeyEvent event, int policyFlags) {
@@ -3132,11 +3148,24 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             }
             return 0;
         } else if (keyCode == KeyEvent.KEYCODE_APP_SWITCH) {
-            if (!keyguardOn) {
-                if (down && repeatCount == 0) {
+            if (down) {
+                if (repeatCount == 0) {
+                    mAppSwitchKeyLongPressed = false;
                     preloadRecentApps();
-                } else if (!down) {
-                    toggleRecentApps();
+                } else if (repeatCount == 1) {
+                    mAppSwitchKeyLongPressed = true;
+                    cancelPreloadRecentApps();
+                    if (!keyguardOn) {
+                        launchAppSwitchLongPressAction();
+                    }
+                }
+            } else {
+                if (mAppSwitchKeyLongPressed) {
+                    mAppSwitchKeyLongPressed = false;
+                } else {
+                    if (!keyguardOn) {
+                        toggleRecentApps();
+                    }
                 }
             }
             return -1;
@@ -3537,6 +3566,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
             mShortcutKeyServices.put(shortcutCode, shortcutService);
         }
+    }
+
+    private void launchAppSwitchLongPressAction() {
+        performHapticFeedbackLw(null, HapticFeedbackConstants.LONG_PRESS, false);
+        triggerVirtualKeypress(KeyEvent.KEYCODE_MENU);
     }
 
     private void launchAssistLongPressAction() {
