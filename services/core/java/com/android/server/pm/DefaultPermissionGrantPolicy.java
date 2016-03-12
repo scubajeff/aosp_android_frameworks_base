@@ -573,6 +573,26 @@ final class DefaultPermissionGrantPolicy {
                 grantRuntimePermissionsLPw(musicPackage, STORAGE_PERMISSIONS, userId);
             }
 
+            // Android Wear Home
+            if (mService.hasSystemFeature(PackageManager.FEATURE_WATCH)) {
+                Intent homeIntent = new Intent(Intent.ACTION_MAIN);
+                homeIntent.addCategory(Intent.CATEGORY_HOME_MAIN);
+
+                PackageParser.Package wearHomePackage = getDefaultSystemHandlerActivityPackageLPr(
+                        homeIntent, userId);
+
+                if (wearHomePackage != null
+                        && doesPackageSupportRuntimePermissions(wearHomePackage)) {
+                    grantRuntimePermissionsLPw(wearHomePackage, CONTACTS_PERMISSIONS, false,
+                            userId);
+                    grantRuntimePermissionsLPw(wearHomePackage, PHONE_PERMISSIONS, true, userId);
+                    grantRuntimePermissionsLPw(wearHomePackage, MICROPHONE_PERMISSIONS, false,
+                            userId);
+                    grantRuntimePermissionsLPw(wearHomePackage, LOCATION_PERMISSIONS, false,
+                            userId);
+                }
+            }
+
             // Google Account
             PackageParser.Package googleaccountPackage = getDefaultProviderAuthorityPackageLPr(
                     "com.google.android.gsf.login", userId);
@@ -623,14 +643,14 @@ final class DefaultPermissionGrantPolicy {
                     "com.google.android.syncadapters.contacts", userId);
             if (googlecontactssyncPackage != null) {
                 grantRuntimePermissionsLPw(googlecontactssyncPackage, CONTACTS_PERMISSIONS, userId);
-            }            
+            }
 
             // Google Backup Transport
             PackageParser.Package googlebackuptransportPackage = getDefaultProviderAuthorityPackageLPr(
                     "com.google.android.backuptransport", userId);
             if (googlebackuptransportPackage != null) {
                 grantRuntimePermissionsLPw(googlebackuptransportPackage, CONTACTS_PERMISSIONS, userId);
-            }            
+            }
             
             // Google Play Framework
             PackageParser.Package gsfcorePackage = getDefaultProviderAuthorityPackageLPr(
@@ -638,7 +658,7 @@ final class DefaultPermissionGrantPolicy {
             if (gsfcorePackage != null) {
                 grantRuntimePermissionsLPw(gsfcorePackage, CONTACTS_PERMISSIONS, userId);
                 grantRuntimePermissionsLPw(gsfcorePackage, PHONE_PERMISSIONS, userId);
-            }        
+            }
 
             // Google Setup Wizard
             PackageParser.Package setupwizardPackage = getDefaultProviderAuthorityPackageLPr(
@@ -646,7 +666,7 @@ final class DefaultPermissionGrantPolicy {
             if (setupwizardPackage != null) {
                 grantRuntimePermissionsLPw(setupwizardPackage, CONTACTS_PERMISSIONS, userId);
                 grantRuntimePermissionsLPw(setupwizardPackage, PHONE_PERMISSIONS, userId);
-            }    
+            }
 
             // Google Play Store
             PackageParser.Package vendingPackage = getDefaultProviderAuthorityPackageLPr(
@@ -657,19 +677,19 @@ final class DefaultPermissionGrantPolicy {
                 grantRuntimePermissionsLPw(vendingPackage, LOCATION_PERMISSIONS, userId);
                 grantRuntimePermissionsLPw(vendingPackage, SMS_PERMISSIONS, userId);
             }
-            
+
             PackageParser.Package exchangePackage = getDefaultProviderAuthorityPackageLPr(
                     "com.android.exchange.provider.ExchangeDirectoryProvider", userId);
             if (exchangePackage != null) {
                 grantRuntimePermissionsLPw(exchangePackage, CONTACTS_PERMISSIONS, userId);
             }
-            
+
             PackageParser.Package contacts2Package = getDefaultProviderAuthorityPackageLPr(
                     "com.android.providers.contacts.ContactsProvider2", userId);
             if (contacts2Package != null) {
                 grantRuntimePermissionsLPw(contacts2Package, CONTACTS_PERMISSIONS, userId);
             }
-            
+
             mService.mSettings.onDefaultRuntimePermissionsGrantedLPr(userId);
         }
     }
@@ -677,7 +697,10 @@ final class DefaultPermissionGrantPolicy {
     private void grantDefaultPermissionsToDefaultSystemDialerAppLPr(
             PackageParser.Package dialerPackage, int userId) {
         if (doesPackageSupportRuntimePermissions(dialerPackage)) {
-            grantRuntimePermissionsLPw(dialerPackage, PHONE_PERMISSIONS, userId);
+            boolean isPhonePermFixed =
+                    mService.hasSystemFeature(PackageManager.FEATURE_WATCH);
+            grantRuntimePermissionsLPw(
+                    dialerPackage, PHONE_PERMISSIONS, isPhonePermFixed, userId);
             grantRuntimePermissionsLPw(dialerPackage, CONTACTS_PERMISSIONS, userId);
             grantRuntimePermissionsLPw(dialerPackage, SMS_PERMISSIONS, userId);
             grantRuntimePermissionsLPw(dialerPackage, MICROPHONE_PERMISSIONS, userId);
