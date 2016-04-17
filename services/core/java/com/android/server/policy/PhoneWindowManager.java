@@ -665,6 +665,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     // Whether to go to sleep entering theater mode from power button
     private boolean mGoToSleepOnButtonPressTheaterMode;
 
+//+++
+    private boolean mWakingByHomePress = false;
+//===
+
     // Screenshot trigger states
     // Time to volume and power must be pressed within this interval of each other.
     private static final long SCREENSHOT_CHORD_DEBOUNCE_DELAY_MILLIS = 150;
@@ -5563,6 +5567,16 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 }
                 break;
             }
+//+++
+            case KeyEvent.KEYCODE_HOME:
+                if (!interactive && down)
+                    mWakingByHomePress = true;
+                else if (mWakingByHomePress) {
+                    result = 0;
+                    mWakingByHomePress = false;
+                }
+                break;
+//===
 
             case KeyEvent.KEYCODE_VOLUME_DOWN:
             case KeyEvent.KEYCODE_VOLUME_UP:
@@ -5594,6 +5608,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         cancelPendingScreenshotChordAction();
                     }
                 }
+
                 if (down) {
                     TelecomManager telecomManager = getTelecommService();
                     if (telecomManager != null) {
@@ -5892,8 +5907,17 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             return false;
         }
 
+=======
+//+++
+        if (mDisplay == null || mDisplay.getState() == Display.STATE_OFF) {
+            return false;
+        }
         // Send events to keyguard while the screen is on and it's showing.
-        if (isKeyguardShowingAndNotOccluded() && !displayOff) {
+        if (isKeyguardShowingAndNotOccluded()) {
+//===
+//        // Send events to keyguard while the screen is on and it's showing.
+//        if (isKeyguardShowingAndNotOccluded() && !displayOff) {
+//---
             return true;
         }
 
