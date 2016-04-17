@@ -591,6 +591,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     // Whether to go to sleep entering theater mode from power button
     private boolean mGoToSleepOnButtonPressTheaterMode;
 
+//+++
+    private boolean mWakingByHomePress = false;
+//===
+
     // Screenshot trigger states
     // Time to volume and power must be pressed within this interval of each other.
     private static final long SCREENSHOT_CHORD_DEBOUNCE_DELAY_MILLIS = 150;
@@ -4987,6 +4991,17 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         // Handle special keys.
         switch (keyCode) {
+//+++
+            case KeyEvent.KEYCODE_HOME:
+                if (!interactive && down)
+                    mWakingByHomePress = true;
+                else if (mWakingByHomePress) {
+                    result = 0;
+                    mWakingByHomePress = false;
+                }
+                break;
+//===
+
             case KeyEvent.KEYCODE_VOLUME_DOWN:
             case KeyEvent.KEYCODE_VOLUME_UP:
             case KeyEvent.KEYCODE_VOLUME_MUTE: {
@@ -5021,6 +5036,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         cancelPendingScreenshotChordAction();
                     }
                 }
+
                 if (down) {
                     TelecomManager telecomManager = getTelecommService();
                     if (telecomManager != null) {
@@ -5299,9 +5315,17 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     }
 
     private boolean shouldDispatchInputWhenNonInteractive() {
-        // Send events to keyguard while the screen is on.
-        if (isKeyguardShowingAndNotOccluded() && mDisplay != null
-                && mDisplay.getState() != Display.STATE_OFF) {
+//+++
+        if (mDisplay == null || mDisplay.getState() == Display.STATE_OFF) {
+            return false;
+        }
+        // Send events to keyguard while the screen is on and it's showing.
+        if (isKeyguardShowingAndNotOccluded()) {
+//===
+//        // Send events to keyguard while the screen is on.
+//        if (isKeyguardShowingAndNotOccluded() && mDisplay != null
+//                && mDisplay.getState() != Display.STATE_OFF) {
+//---
             return true;
         }
 
