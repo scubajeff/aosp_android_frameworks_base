@@ -2009,11 +2009,7 @@ public class SettingsProvider extends ContentProvider {
                 }
 
                 if (currentVersion == 122) {
-                    final SettingsState globalSettings = getGlobalSettingsLocked();
-                    String defaultDisabledProfiles = (getContext().getResources().getString(
-                            R.string.def_bluetooth_disabled_profiles));
-                    globalSettings.insertSettingLocked(Settings.Global.BLUETOOTH_DISABLED_PROFILES,
-                            defaultDisabledProfiles, SettingsState.SYSTEM_PACKAGE_NAME);
+                    //Dummy
                     currentVersion = 123;
                 }
 

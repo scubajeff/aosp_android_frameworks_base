@@ -2387,8 +2387,9 @@ public final class Settings {
 
         private static final Validator DIM_SCREEN_VALIDATOR = sBooleanValidator;
 
+//+++
         /**
-         * The butto nmode
+         * The button nmode
          */
         public static final String BUTTON_LIGHT = "button_light";
 
@@ -2415,6 +2416,7 @@ public final class Settings {
          * SCREEN_COLORTONE value for auto mode.
          */
         public static final int SCREEN_COLORTONE_AUTO = 4;
+//===
 
         /**
          * The amount of time in milliseconds before the device goes to sleep or begins
@@ -3241,13 +3243,14 @@ public final class Settings {
             }
         };
 
+//+++
         /**
          */
         public static final String NAVBAR_ENABLED = "navbar";
 
         /** @hide */
         public static final Validator NAVBAR_ENABLED_VALIDATOR = sBooleanValidator;
-
+//===
 
         /**
          * IMPORTANT: If you add a new public settings you also have to add it to
@@ -3280,8 +3283,10 @@ public final class Settings {
             SCREEN_OFF_TIMEOUT,
             SCREEN_BRIGHTNESS,
             SCREEN_BRIGHTNESS_MODE,
+//+++
             BUTTON_LIGHT,
             SCREEN_COLORTONE,
+//===
             SCREEN_AUTO_BRIGHTNESS_ADJ,
             VIBRATE_INPUT_DEVICES,
             MODE_RINGER_STREAMS_AFFECTED,
@@ -3334,8 +3339,10 @@ public final class Settings {
             PUBLIC_SETTINGS.add(SCREEN_OFF_TIMEOUT);
             PUBLIC_SETTINGS.add(SCREEN_BRIGHTNESS);
             PUBLIC_SETTINGS.add(SCREEN_BRIGHTNESS_MODE);
+//+++
             PUBLIC_SETTINGS.add(BUTTON_LIGHT);
             PUBLIC_SETTINGS.add(SCREEN_COLORTONE);
+//===
             PUBLIC_SETTINGS.add(MODE_RINGER_STREAMS_AFFECTED);
             PUBLIC_SETTINGS.add(MUTE_STREAMS_AFFECTED);
             PUBLIC_SETTINGS.add(VIBRATE_ON);
@@ -3364,7 +3371,9 @@ public final class Settings {
             PUBLIC_SETTINGS.add(SOUND_EFFECTS_ENABLED);
             PUBLIC_SETTINGS.add(HAPTIC_FEEDBACK_ENABLED);
             PUBLIC_SETTINGS.add(SHOW_WEB_SUGGESTIONS);
+//+++
             PUBLIC_SETTINGS.add(NAVBAR_ENABLED);
+//===
         }
 
         /**
@@ -3433,8 +3442,10 @@ public final class Settings {
             VALIDATORS.put(SCREEN_OFF_TIMEOUT, SCREEN_OFF_TIMEOUT_VALIDATOR);
             VALIDATORS.put(SCREEN_BRIGHTNESS, SCREEN_BRIGHTNESS_VALIDATOR);
             VALIDATORS.put(SCREEN_BRIGHTNESS_MODE, SCREEN_BRIGHTNESS_MODE_VALIDATOR);
+//+++
             VALIDATORS.put(BUTTON_LIGHT, BUTTON_LIGHT_VALIDATOR);
             VALIDATORS.put(SCREEN_COLORTONE, SCREEN_COLORTONE_VALIDATOR);
+//===
             VALIDATORS.put(MODE_RINGER_STREAMS_AFFECTED, MODE_RINGER_STREAMS_AFFECTED_VALIDATOR);
             VALIDATORS.put(MUTE_STREAMS_AFFECTED, MUTE_STREAMS_AFFECTED_VALIDATOR);
             VALIDATORS.put(VIBRATE_ON, VIBRATE_ON_VALIDATOR);
@@ -3492,7 +3503,9 @@ public final class Settings {
             VALIDATORS.put(WIFI_STATIC_NETMASK, WIFI_STATIC_NETMASK_VALIDATOR);
             VALIDATORS.put(WIFI_STATIC_DNS1, WIFI_STATIC_DNS1_VALIDATOR);
             VALIDATORS.put(WIFI_STATIC_DNS2, WIFI_STATIC_DNS2_VALIDATOR);
+//+++
             VALIDATORS.put(NAVBAR_ENABLED, NAVBAR_ENABLED_VALIDATOR);
+//===
         }
 
         /**
@@ -8136,13 +8149,6 @@ public final class Settings {
          * @hide
          */
         public static final String CONTACT_METADATA_SYNC = "contact_metadata_sync";
-
-        /**
-         * Whether to enable cellular on boot.
-         * The value 1 - enable, 0 - disable
-         * @hide
-         */
-        public static final String ENABLE_CELLULAR_ON_BOOT = "enable_cellular_on_boot";
     }
 
     /**

@@ -47,7 +47,9 @@ import android.graphics.Rect;
 import android.hardware.hdmi.HdmiControlManager;
 import android.hardware.hdmi.HdmiPlaybackClient;
 import android.hardware.hdmi.HdmiPlaybackClient.OneTouchPlayCallback;
+//+++
 import android.hardware.input.InputManager;
+//===
 import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.AudioSystem;
@@ -542,7 +544,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     Intent mDeskDockIntent;
     boolean mSearchKeyShortcutPending;
     boolean mConsumeSearchKeyUp;
+//+++
     boolean mAppSwitchKeyLongPressed;
+//===
     boolean mAssistKeyLongPressed;
     boolean mPendingMetaAction;
 
@@ -745,9 +749,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             resolver.registerContentObserver(Settings.Global.getUriFor(
                     Settings.Global.POLICY_CONTROL), false, this,
                     UserHandle.USER_ALL);
+//+++
             resolver.registerContentObserver(Settings.System.getUriFor(
                     Settings.System.NAVBAR_ENABLED), false, this,
                     UserHandle.USER_ALL);
+//???
             updateSettings();
         }
 
@@ -1347,7 +1353,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mDreamManagerInternal = LocalServices.getService(DreamManagerInternal.class);
         mPowerManagerInternal = LocalServices.getService(PowerManagerInternal.class);
         mAppOpsManager = (AppOpsManager) mContext.getSystemService(Context.APP_OPS_SERVICE);
+//+++
         mPowerManagerInternal = LocalServices.getService(PowerManagerInternal.class);
+//===
 
         // Init display burn-in protection
         boolean burnInProtectionEnabled = context.getResources().getBoolean(
@@ -1791,14 +1799,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 mImmersiveModeConfirmation.loadSetting(mCurrentUserId);
             }
 
+//+++
             // Configure navbar enabled.
             boolean navBarEnabledSetting = Settings.System.getIntForUser(resolver,
                     Settings.System.NAVBAR_ENABLED, 0,
                     UserHandle.USER_CURRENT) != 0;
             if (mHasNavigationBar != navBarEnabledSetting) {
                 mHasNavigationBar = navBarEnabledSetting;
-                //updateWakeGestureListenerLp();
             }
+//===
         }
         synchronized (mWindowManagerFuncs.getWindowManagerLock()) {
             PolicyControl.reloadFromSetting(mContext);
@@ -2669,6 +2678,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             WindowManager.LayoutParams.TYPE_SYSTEM_ERROR,
         };
 
+//+++
     private void triggerVirtualKeypress(final int keyCode) {
         InputManager im = InputManager.getInstance();
         long now = SystemClock.uptimeMillis();
@@ -2682,6 +2692,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         im.injectInputEvent(downEvent, InputManager.INJECT_INPUT_EVENT_MODE_ASYNC);
         im.injectInputEvent(upEvent, InputManager.INJECT_INPUT_EVENT_MODE_ASYNC);
     }
+//===
 
     /** {@inheritDoc} */
     @Override
@@ -2850,6 +2861,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             }
             return 0;
         } else if (keyCode == KeyEvent.KEYCODE_APP_SWITCH) {
+//+++
             if (down) {
                 if (repeatCount == 0) {
                     mAppSwitchKeyLongPressed = false;
@@ -2870,6 +2882,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     }
                 }
             }
+//===
+//            if (!keyguardOn) {
+//                if (down && repeatCount == 0) {
+//                    preloadRecentApps();
+//                } else if (!down) {
+//                    toggleRecentApps();
+//                }
+//            }
+//---
             return -1;
         } else if (keyCode == KeyEvent.KEYCODE_N && event.isMetaPressed()) {
             if (down) {
@@ -3184,10 +3205,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         return false;
     }
 
+//+++
     private void launchAppSwitchLongPressAction() {
         performHapticFeedbackLw(null, HapticFeedbackConstants.LONG_PRESS, false);
         triggerVirtualKeypress(KeyEvent.KEYCODE_MENU);
     }
+//===
 
     private void launchAssistLongPressAction() {
         performHapticFeedbackLw(null, HapticFeedbackConstants.LONG_PRESS, false);
@@ -5068,7 +5091,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         cancelPendingScreenshotChordAction();
                     }
                 }
-
                 if (down) {
                     TelecomManager telecomManager = getTelecommService();
                     if (telecomManager != null) {
@@ -5176,15 +5198,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     sleepPress(event.getEventTime());
                 } else {
                     sleepRelease(event.getEventTime());
-                }
-                break;
-            }
-
-            case KeyEvent.KEYCODE_SOFT_SLEEP: {
-                result &= ~ACTION_PASS_TO_USER;
-                isWakeKey = false;
-                if (!down) {
-                    mPowerManagerInternal.setUserInactiveOverrideFromWindowManager();
                 }
                 break;
             }

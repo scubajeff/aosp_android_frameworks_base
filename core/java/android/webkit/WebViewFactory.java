@@ -97,6 +97,7 @@ public final class WebViewFactory {
     }
 
     public static String getWebViewPackageName() {
+//+++
         String configres = AppGlobals.getInitialApplication().getString(
                              com.android.internal.R.string.config_webViewPackageName);
         Application initialApplication = AppGlobals.getInitialApplication();
@@ -110,6 +111,10 @@ public final class WebViewFactory {
         } catch (PackageManager.NameNotFoundException e){
              return "com.android.webview";
         }
+//===
+//        return AppGlobals.getInitialApplication().getString(
+//                com.android.internal.R.string.config_webViewPackageName);
+//---
     }
 
     private static PackageInfo fetchPackageInfo() {
@@ -536,6 +541,7 @@ public final class WebViewFactory {
         }
     }
 
+//+++
     private static boolean isPackageInstalled(Context context, String packageName) {
         try {
             return context.getPackageManager().getPackageInfo(packageName, 0) != null;
@@ -543,6 +549,7 @@ public final class WebViewFactory {
             return false;
         }
     }
+//===
 
     private static IWebViewUpdateService getUpdateService() {
         return IWebViewUpdateService.Stub.asInterface(ServiceManager.getService("webviewupdate"));

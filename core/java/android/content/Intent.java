@@ -1603,6 +1603,7 @@ public class Intent implements Parcelable, Cloneable {
     public static final String ACTION_GET_PERMISSIONS_COUNT
             = "android.intent.action.GET_PERMISSIONS_COUNT";
 
+//+++
     /**
      * Broadcast action that requests list of all apps that have runtime permissions.  It will
      * respond to the request by sending a broadcast with action defined by
@@ -1619,6 +1620,7 @@ public class Intent implements Parcelable, Cloneable {
      */
     public static final String ACTION_GET_PERMISSIONS_PACKAGES
             = "android.intent.action.GET_PERMISSIONS_PACKAGES";
+//===
 
     /**
      * Extra included in response to {@link #ACTION_GET_PERMISSIONS_COUNT}.
@@ -1634,6 +1636,7 @@ public class Intent implements Parcelable, Cloneable {
     public static final String EXTRA_GET_PERMISSIONS_GROUP_LIST_RESULT
             = "android.intent.extra.GET_PERMISSIONS_GROUP_LIST_RESULT";
 
+//+++
     /**
      * String list of apps that have one or more runtime permissions.
      * @hide
@@ -1655,6 +1658,7 @@ public class Intent implements Parcelable, Cloneable {
      */
     public static final String EXTRA_GET_PERMISSIONS_IS_SYSTEM_APP_LIST_RESULT
             = "android.intent.extra.GET_PERMISSIONS_IS_SYSTEM_APP_LIST_RESULT";
+//===
 
     /**
      * Required extra to be sent with {@link #ACTION_GET_PERMISSIONS_COUNT} broadcasts.
@@ -1663,12 +1667,14 @@ public class Intent implements Parcelable, Cloneable {
     public static final String EXTRA_GET_PERMISSIONS_RESPONSE_INTENT
             = "android.intent.extra.GET_PERMISSIONS_RESONSE_INTENT";
 
+//+++
     /**
      * Required extra to be sent with {@link #ACTION_GET_PERMISSIONS_PACKAGES} broadcasts.
      * @hide
      */
     public static final String EXTRA_GET_PERMISSIONS_PACKAGES_RESPONSE_INTENT
             = "android.intent.extra.GET_PERMISSIONS_PACKAGES_RESONSE_INTENT";
+//===
 
     /**
      * Activity action: Launch UI to manage which apps have a given permission.
@@ -3030,6 +3036,7 @@ public class Intent implements Parcelable, Cloneable {
     public static final String EXTRA_PROCESS_TEXT_READONLY =
             "android.intent.extra.PROCESS_TEXT_READONLY";
 
+//+++
     /**
      * Broadcast action: reports when a new thermal event has been reached. When the device
      * is reaching its maximum temperatue, the thermal level reported
@@ -3061,7 +3068,7 @@ public class Intent implements Parcelable, Cloneable {
      * {@hide}
      */
     public static final int EXTRA_THERMAL_STATE_EXCEEDED = 2;
-
+//===
 
     // ---------------------------------------------------------------------
     // ---------------------------------------------------------------------
@@ -3164,6 +3171,8 @@ public class Intent implements Parcelable, Cloneable {
      */
     @SdkConstant(SdkConstantType.INTENT_CATEGORY)
     public static final String CATEGORY_HOME = "android.intent.category.HOME";
+
+//+++
     /**
      * This is the home activity that is displayed when the device is finished setting up and ready
      * for use.
@@ -3171,6 +3180,8 @@ public class Intent implements Parcelable, Cloneable {
      */
     @SdkConstant(SdkConstantType.INTENT_CATEGORY)
     public static final String CATEGORY_HOME_MAIN = "android.intent.category.HOME_MAIN";
+//===
+
     /**
      * This is the setup wizard activity, that is the first activity that is displayed
      * when the user sets up the device for the first time.

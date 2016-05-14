@@ -174,7 +174,9 @@ public final class PowerManagerService extends SystemService
     private SettingsObserver mSettingsObserver;
     private DreamManagerInternal mDreamManager;
     private Light mAttentionLight;
+//+++
     private Light mColortoneLight;
+//===
 
     private final Object mLock = new Object();
 
@@ -389,22 +391,16 @@ public final class PowerManagerService extends SystemService
     // One of the Settings.System.SCREEN_BRIGHTNESS_MODE_* constants.
     private int mScreenBrightnessModeSetting;
 
+//+++
     // The screen color mode.
     // One of the Settings.System.SCREEN_COLORTONE_* constants.
     private int mScreenColortoneSetting;
+//===
 
     // The screen brightness setting override from the window manager
     // to allow the current foreground activity to override the brightness.
     // Use -1 to disable.
     private int mScreenBrightnessOverrideFromWindowManager = -1;
-
-    // The window manager has determined the user to be inactive via other means.
-    // Set this to false to disable.
-    private boolean mUserInactiveOverrideFromWindowManager;
-
-    // The next possible user activity timeout after being explicitly told the user is inactive.
-    // Set to -1 when not told the user is inactive since the last period spent dozing or asleep.
-    private long mOverriddenTimeout = -1;
 
     // The user activity timeout override from the window manager
     // to allow the current foreground activity to override the user activity timeout.
@@ -553,7 +549,9 @@ public final class PowerManagerService extends SystemService
 
             mLightsManager = getLocalService(LightsManager.class);
             mAttentionLight = mLightsManager.getLight(LightsManager.LIGHT_ID_ATTENTION);
-            mColortoneLight = mLightsManager.getLight(LightsManager.LIGHT_ID_ATTENTION);
+//+++
+            mColortoneLight = mLightsManager.getLight(LightsManager.LIGHT_ID_COLORTONE);
+//===
 
             // Initialize display power management.
             mDisplayManagerInternal.initPowerManagement(
@@ -604,9 +602,11 @@ public final class PowerManagerService extends SystemService
             resolver.registerContentObserver(Settings.System.getUriFor(
                     Settings.System.SCREEN_BRIGHTNESS_MODE),
                     false, mSettingsObserver, UserHandle.USER_ALL);
+//+++
             resolver.registerContentObserver(Settings.System.getUriFor(
                     Settings.System.SCREEN_COLORTONE),
                     false, mSettingsObserver, UserHandle.USER_ALL);
+//===
             resolver.registerContentObserver(Settings.System.getUriFor(
                     Settings.System.SCREEN_AUTO_BRIGHTNESS_ADJ),
                     false, mSettingsObserver, UserHandle.USER_ALL);
@@ -728,9 +728,11 @@ public final class PowerManagerService extends SystemService
                 Settings.System.SCREEN_BRIGHTNESS_MODE,
                 Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL, UserHandle.USER_CURRENT);
 
+//+++
         mScreenColortoneSetting = Settings.System.getIntForUser(resolver,
                 Settings.System.SCREEN_COLORTONE,
                 Settings.System.SCREEN_COLORTONE_AUTO, UserHandle.USER_CURRENT);
+//===
 
         final boolean lowPowerModeEnabled = Settings.Global.getInt(resolver,
                 Settings.Global.LOW_POWER_MODE, 0) != 0;
@@ -1049,11 +1051,6 @@ public final class PowerManagerService extends SystemService
 
             mNotifier.onUserActivity(event, uid);
 
-            if (mUserInactiveOverrideFromWindowManager) {
-                mUserInactiveOverrideFromWindowManager = false;
-                mOverriddenTimeout = -1;
-            }
-
             if (mWakefulness == WAKEFULNESS_ASLEEP
                     || mWakefulness == WAKEFULNESS_DOZING
                     || (flags & PowerManager.USER_ACTIVITY_FLAG_INDIRECT) != 0) {
@@ -1269,27 +1266,11 @@ public final class PowerManagerService extends SystemService
         }
     }
 
-    /**
-     * Logs the time the device would have spent awake before user activity timeout,
-     * had the system not been told the user was inactive.
-     */
-    private void logSleepTimeoutRecapturedLocked() {
-        final long now = SystemClock.uptimeMillis();
-        final long savedWakeTimeMs = mOverriddenTimeout - now;
-        if (savedWakeTimeMs >= 0) {
-            EventLog.writeEvent(EventLogTags.POWER_SOFT_SLEEP_REQUESTED, savedWakeTimeMs);
-            mOverriddenTimeout = -1;
-        }
-    }
-
     private void finishWakefulnessChangeIfNeededLocked() {
         if (mWakefulnessChanging && mDisplayReady) {
             if (mWakefulness == WAKEFULNESS_DOZING
                     && (mWakeLockSummary & WAKE_LOCK_DOZE) == 0) {
                 return; // wait until dream has enabled dozing
-            }
-            if (mWakefulness == WAKEFULNESS_DOZING || mWakefulness == WAKEFULNESS_ASLEEP) {
-                logSleepTimeoutRecapturedLocked();
             }
             mWakefulnessChanging = false;
             mNotifier.onWakefulnessChangeFinished();
@@ -1567,7 +1548,6 @@ public final class PowerManagerService extends SystemService
                 final int sleepTimeout = getSleepTimeoutLocked();
                 final int screenOffTimeout = getScreenOffTimeoutLocked(sleepTimeout);
                 final int screenDimDuration = getScreenDimDurationLocked(screenOffTimeout);
-                final boolean userInactiveOverride = mUserInactiveOverrideFromWindowManager;
 
                 mUserActivitySummary = 0;
                 if (mLastUserActivityTime >= mLastWakeTime) {
@@ -1593,7 +1573,6 @@ public final class PowerManagerService extends SystemService
                         }
                     }
                 }
-
                 if (mUserActivitySummary == 0) {
                     if (sleepTimeout >= 0) {
                         final long anyUserActivity = Math.max(mLastUserActivityTime,
@@ -1609,20 +1588,6 @@ public final class PowerManagerService extends SystemService
                         nextTimeout = -1;
                     }
                 }
-
-                if (mUserActivitySummary != USER_ACTIVITY_SCREEN_DREAM && userInactiveOverride) {
-                    if ((mUserActivitySummary &
-                            (USER_ACTIVITY_SCREEN_BRIGHT | USER_ACTIVITY_SCREEN_DIM)) != 0) {
-                        // Device is being kept awake by recent user activity
-                        if (nextTimeout >= now && mOverriddenTimeout == -1) {
-                            // Save when the next timeout would have occurred
-                            mOverriddenTimeout = nextTimeout;
-                        }
-                    }
-                    mUserActivitySummary = USER_ACTIVITY_SCREEN_DREAM;
-                    nextTimeout = -1;
-                }
-
                 if (mUserActivitySummary != 0 && nextTimeout >= 0) {
                     Message msg = mHandler.obtainMessage(MSG_USER_ACTIVITY_TIMEOUT);
                     msg.setAsynchronous(true);
@@ -1969,7 +1934,9 @@ public final class PowerManagerService extends SystemService
             screenAutoBrightnessAdjustment = Math.max(Math.min(
                     screenAutoBrightnessAdjustment, 1.0f), -1.0f);
 
+//+++
             setColortoneLightInternal(mScreenColortoneSetting);
+//===
 
             // Update display power request.
             mDisplayPowerRequest.screenBrightness = screenBrightness;
@@ -2500,6 +2467,7 @@ public final class PowerManagerService extends SystemService
         light.setFlashing(color, Light.LIGHT_FLASH_HARDWARE, (on ? 3 : 0), 0);
     }
 
+//+++
     private void setColortoneLightInternal(int colortone) {
         Light light;
         synchronized (mLock) {
@@ -2512,6 +2480,7 @@ public final class PowerManagerService extends SystemService
         // Control light outside of lock.
         light.setBrightness(colortone);
     }
+//===
 
     private void boostScreenBrightnessInternal(long eventTime, int uid) {
         synchronized (mLock) {
@@ -2564,14 +2533,6 @@ public final class PowerManagerService extends SystemService
                 mDirty |= DIRTY_SETTINGS;
                 updatePowerStateLocked();
             }
-        }
-    }
-
-    private void setUserInactiveOverrideFromWindowManagerInternal() {
-        synchronized (mLock) {
-            mUserInactiveOverrideFromWindowManager = true;
-            mDirty |= DIRTY_USER_ACTIVITY;
-            updatePowerStateLocked();
         }
     }
 
@@ -2760,13 +2721,13 @@ public final class PowerManagerService extends SystemService
             pw.println("  mScreenAutoBrightnessAdjustmentSetting="
                     + mScreenAutoBrightnessAdjustmentSetting);
             pw.println("  mScreenBrightnessModeSetting=" + mScreenBrightnessModeSetting);
+//+++
             pw.println("  mScreenColortoneSetting=" + mScreenColortoneSetting);
+//===
             pw.println("  mScreenBrightnessOverrideFromWindowManager="
                     + mScreenBrightnessOverrideFromWindowManager);
             pw.println("  mUserActivityTimeoutOverrideFromWindowManager="
                     + mUserActivityTimeoutOverrideFromWindowManager);
-            pw.println("  mUserInactiveOverrideFromWindowManager="
-                    + mUserInactiveOverrideFromWindowManager);
             pw.println("  mTemporaryScreenBrightnessSettingOverride="
                     + mTemporaryScreenBrightnessSettingOverride);
             pw.println("  mTemporaryScreenAutoBrightnessAdjustmentSettingOverride="
@@ -3568,11 +3529,6 @@ public final class PowerManagerService extends SystemService
                 screenBrightness = PowerManager.BRIGHTNESS_DEFAULT;
             }
             setDozeOverrideFromDreamManagerInternal(screenState, screenBrightness);
-        }
-
-        @Override
-        public void setUserInactiveOverrideFromWindowManager() {
-            setUserInactiveOverrideFromWindowManagerInternal();
         }
 
         @Override

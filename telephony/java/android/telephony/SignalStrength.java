@@ -312,7 +312,11 @@ public class SignalStrength implements Parcelable {
         if (DBG) log("Size of signalstrength parcel:" + in.dataSize());
 
         SignalStrength ss = new SignalStrength();
+//+++
         ss.mGsmSignalStrength = in.readInt() & 0xff;
+//===
+///        ss.mGsmSignalStrength = in.readInt();
+//---
         ss.mGsmBitErrorRate = in.readInt();
         ss.mCdmaDbm = in.readInt();
         ss.mCdmaEcio = in.readInt();
@@ -324,8 +328,7 @@ public class SignalStrength implements Parcelable {
         ss.mLteRsrq = in.readInt();
         ss.mLteRssnr = in.readInt();
         ss.mLteCqi = in.readInt();
-        //ss.mTdScdmaRscp = in.readInt();
-
+//+++
         log("gsmSignalStrength:" + ss.mGsmSignalStrength + " gsmBitErrorRate:" + ss.mGsmBitErrorRate +
             " cdmaDbm:" + ss.mCdmaDbm + " cdmaEcio:" + ss.mCdmaEcio + " evdoDbm:" + ss.mEvdoDbm +
             " evdoEcio: " + ss.mEvdoEcio + " evdoSnr:" + ss.mEvdoSnr +
@@ -343,6 +346,9 @@ public class SignalStrength implements Parcelable {
         else {
             ss.mLteSignalStrength &= 0xff;
         }
+//===
+//        ss.mTdScdmaRscp = in.readInt();
+//---
 
         return ss;
     }

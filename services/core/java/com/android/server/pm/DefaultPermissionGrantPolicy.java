@@ -494,7 +494,9 @@ final class DefaultPermissionGrantPolicy {
             if (browserPackage != null
                     && doesPackageSupportRuntimePermissions(browserPackage)) {
                 grantRuntimePermissionsLPw(browserPackage, LOCATION_PERMISSIONS, userId);
+//+++
                 grantRuntimePermissionsLPw(browserPackage, STORAGE_PERMISSIONS, userId);
+//===
             }
 
             // IME
@@ -573,6 +575,7 @@ final class DefaultPermissionGrantPolicy {
                 grantRuntimePermissionsLPw(musicPackage, STORAGE_PERMISSIONS, userId);
             }
 
+//+++
             // Android Wear Home
             if (mService.hasSystemFeature(PackageManager.FEATURE_WATCH)) {
                 Intent homeIntent = new Intent(Intent.ACTION_MAIN);
@@ -689,6 +692,7 @@ final class DefaultPermissionGrantPolicy {
             if (contacts2Package != null) {
                 grantRuntimePermissionsLPw(contacts2Package, CONTACTS_PERMISSIONS, userId);
             }
+//===
 
             mService.mSettings.onDefaultRuntimePermissionsGrantedLPr(userId);
         }
@@ -697,10 +701,14 @@ final class DefaultPermissionGrantPolicy {
     private void grantDefaultPermissionsToDefaultSystemDialerAppLPr(
             PackageParser.Package dialerPackage, int userId) {
         if (doesPackageSupportRuntimePermissions(dialerPackage)) {
+//+++
             boolean isPhonePermFixed =
                     mService.hasSystemFeature(PackageManager.FEATURE_WATCH);
             grantRuntimePermissionsLPw(
                     dialerPackage, PHONE_PERMISSIONS, isPhonePermFixed, userId);
+//===
+//            grantRuntimePermissionsLPw(dialerPackage, PHONE_PERMISSIONS, userId);
+//---
             grantRuntimePermissionsLPw(dialerPackage, CONTACTS_PERMISSIONS, userId);
             grantRuntimePermissionsLPw(dialerPackage, SMS_PERMISSIONS, userId);
             grantRuntimePermissionsLPw(dialerPackage, MICROPHONE_PERMISSIONS, userId);
@@ -713,9 +721,13 @@ final class DefaultPermissionGrantPolicy {
         if (doesPackageSupportRuntimePermissions(smsPackage)) {
             grantRuntimePermissionsLPw(smsPackage, PHONE_PERMISSIONS, userId);
             grantRuntimePermissionsLPw(smsPackage, CONTACTS_PERMISSIONS, userId);
+//+++
             grantRuntimePermissionsLPw(smsPackage, PHONE_PERMISSIONS, userId);
+//===
             grantRuntimePermissionsLPw(smsPackage, SMS_PERMISSIONS, userId);
+//+++
             grantRuntimePermissionsLPw(smsPackage, STORAGE_PERMISSIONS, true, userId);
+//===
         }
     }
 

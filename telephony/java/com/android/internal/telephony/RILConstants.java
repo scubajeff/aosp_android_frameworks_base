@@ -335,7 +335,9 @@ cat include/telephony/ril.h | \
     int RIL_REQUEST_PULL_LCEDATA = 134;
     int RIL_REQUEST_GET_ACTIVITY_INFO = 135;
 
+//+++
     int RIL_REQUEST_DIAL_EMERGENCY = 10016;
+//===
 
     int RIL_UNSOL_RESPONSE_BASE = 1000;
     int RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED = 1000;
@@ -385,9 +387,11 @@ cat include/telephony/ril.h | \
     int RIL_UNSOL_STK_CC_ALPHA_NOTIFY = 1044;
     int RIL_UNSOL_LCEDATA_RECV = 1045;
 
+//+++
     int RIL_UNSOL_DEVICE_READY_NOTI = 11008;
     int RIL_UNSOL_AM = 11010;
     int RIL_UNSOL_WB_AMR_STATE = 11017;
     int RIL_UNSOL_RESPONSE_HANDOVER = 11021;
     int RIL_UNSOL_SNDMGR_WB_AMR_REPORT = 20017;
+//===
 }
