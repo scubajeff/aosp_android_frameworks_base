@@ -743,6 +743,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             resolver.registerContentObserver(Settings.Global.getUriFor(
                     Settings.Global.POLICY_CONTROL), false, this,
                     UserHandle.USER_ALL);
+            resolver.registerContentObserver(Settings.System.getUriFor(
+                    Settings.System.NAVBAR_ENABLED), false, this,
+                    UserHandle.USER_ALL);
             updateSettings();
         }
 
@@ -1783,6 +1786,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             }
             if (mImmersiveModeConfirmation != null) {
                 mImmersiveModeConfirmation.loadSetting(mCurrentUserId);
+            }
+
+            // Configure navbar enabled.
+            boolean navBarEnabledSetting = Settings.System.getIntForUser(resolver,
+                    Settings.System.NAVBAR_ENABLED, 0,
+                    UserHandle.USER_CURRENT) != 0;
+            if (mHasNavigationBar != navBarEnabledSetting) {
+                mHasNavigationBar = navBarEnabledSetting;
+                //updateWakeGestureListenerLp();
             }
         }
         synchronized (mWindowManagerFuncs.getWindowManagerLock()) {

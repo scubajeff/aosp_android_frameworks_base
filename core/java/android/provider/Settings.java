@@ -3242,6 +3242,14 @@ public final class Settings {
         };
 
         /**
+         */
+        public static final String NAVBAR_ENABLED = "navbar";
+
+        /** @hide */
+        public static final Validator NAVBAR_ENABLED_VALIDATOR = sBooleanValidator;
+
+
+        /**
          * IMPORTANT: If you add a new public settings you also have to add it to
          * PUBLIC_SETTINGS below. If the new setting is hidden you have to add
          * it to PRIVATE_SETTINGS below. Also add a validator that can validate
@@ -3356,6 +3364,7 @@ public final class Settings {
             PUBLIC_SETTINGS.add(SOUND_EFFECTS_ENABLED);
             PUBLIC_SETTINGS.add(HAPTIC_FEEDBACK_ENABLED);
             PUBLIC_SETTINGS.add(SHOW_WEB_SUGGESTIONS);
+            PUBLIC_SETTINGS.add(NAVBAR_ENABLED);
         }
 
         /**
@@ -3483,6 +3492,7 @@ public final class Settings {
             VALIDATORS.put(WIFI_STATIC_NETMASK, WIFI_STATIC_NETMASK_VALIDATOR);
             VALIDATORS.put(WIFI_STATIC_DNS1, WIFI_STATIC_DNS1_VALIDATOR);
             VALIDATORS.put(WIFI_STATIC_DNS2, WIFI_STATIC_DNS2_VALIDATOR);
+            VALIDATORS.put(NAVBAR_ENABLED, NAVBAR_ENABLED_VALIDATOR);
         }
 
         /**
