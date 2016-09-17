@@ -526,7 +526,7 @@ class ContextImpl extends Context {
                 if (e.errno == OsConstants.EEXIST) {
                     // We must have raced with someone; that's okay
                 } else {
-                    Log.w(TAG, "Failed to ensure " + file + ": " + e.getMessage());
+                    Log.w(TAG, "Failed to ensure private dir exists " + file + ": Exception: " + e.getMessage());
                 }
             }
         }
@@ -2213,11 +2213,11 @@ class ContextImpl extends Context {
                         try {
                             final int res = mount.mkdirs(getPackageName(), dir.getAbsolutePath());
                             if (res != 0) {
-                                Log.w(TAG, "Failed to ensure " + dir + ": " + res);
+                                Log.w(TAG, "Failed to ensure external dir exists" + dir + ": " + res);
                                 dir = null;
                             }
                         } catch (Exception e) {
-                            Log.w(TAG, "Failed to ensure " + dir + ": " + e);
+                            Log.w(TAG, "Failed to ensure external dir exists " + dir + ": Exception:" + e);
                             dir = null;
                         }
                     }

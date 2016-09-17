@@ -9798,6 +9798,7 @@ public class PackageManagerService extends IPackageManager.Stub {
     }
 
     private static boolean hasPermission(PackageParser.Package pkgInfo, String perm) {
+    	Log.d(TAG, "hasPermission: " + pkgInfo + " - " + perm);
         for (int i=pkgInfo.permissions.size()-1; i>=0; i--) {
             if (pkgInfo.permissions.get(i).info.name.equals(perm)) {
                 return true;

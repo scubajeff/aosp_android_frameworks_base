@@ -43,6 +43,9 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+//+++
+import android.os.PowerManager;
+//===
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemClock;
@@ -103,6 +106,10 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
     private static final String GLOBAL_ACTION_KEY_LOCKDOWN = "lockdown";
     private static final String GLOBAL_ACTION_KEY_VOICEASSIST = "voiceassist";
     private static final String GLOBAL_ACTION_KEY_ASSIST = "assist";
+//+++
+    private static final String GLOBAL_ACTION_KEY_REBOOT = "reboot";
+    private static final String GLOBAL_ACTION_KEY_RECOVERY = "recovery";
+//===
 
     private final Context mContext;
     private final WindowManagerFuncs mWindowManagerFuncs;
@@ -275,6 +282,12 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
             }
             if (GLOBAL_ACTION_KEY_POWER.equals(actionKey)) {
                 mItems.add(new PowerAction());
+//+++
+            } else if (GLOBAL_ACTION_KEY_REBOOT.equals(actionKey)) {
+                mItems.add(new RebootAction());
+            } else if (GLOBAL_ACTION_KEY_RECOVERY.equals(actionKey)) {
+                mItems.add(new RecoveryAction());
+//===
             } else if (GLOBAL_ACTION_KEY_AIRPLANE.equals(actionKey)) {
                 mItems.add(mAirplaneModeOn);
             } else if (GLOBAL_ACTION_KEY_BUGREPORT.equals(actionKey)) {
@@ -368,6 +381,64 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
             mWindowManagerFuncs.shutdown(false /* confirm */);
         }
     }
+
+//+++
+    private final class RebootAction extends SinglePressAction implements LongPressAction {
+        private RebootAction() {
+            super(com.android.internal.R.drawable.ic_lock_reboot,
+                R.string.global_action_reboot);
+        }
+
+        @Override
+        public boolean onLongPress() {
+            return false;
+        }
+
+        @Override
+        public boolean showDuringKeyguard() {
+            return true;
+        }
+
+        @Override
+        public boolean showBeforeProvisioning() {
+            return true;
+        }
+
+        @Override
+        public void onPress() {
+            // shutdown by making sure radio and power are handled accordingly.
+            mWindowManagerFuncs.reboot(PowerManager.REBOOT_REQUESTED_BY_DEVICE_OWNER, false /* confirm */);
+        }
+    }
+
+    private final class RecoveryAction extends SinglePressAction implements LongPressAction {
+        private RecoveryAction() {
+            super(com.android.internal.R.drawable.ic_lock_reboot,
+                R.string.global_action_recovery);
+        }
+
+        @Override
+        public boolean onLongPress() {
+            return false;
+        }
+
+        @Override
+        public boolean showDuringKeyguard() {
+            return true;
+        }
+
+        @Override
+        public boolean showBeforeProvisioning() {
+            return true;
+        }
+
+        @Override
+        public void onPress() {
+            // shutdown by making sure radio and power are handled accordingly.
+           mWindowManagerFuncs.reboot(PowerManager.REBOOT_RECOVERY, false /* confirm */);
+        }
+    }
+//===
 
     private class BugReportAction extends SinglePressAction implements LongPressAction {
 
