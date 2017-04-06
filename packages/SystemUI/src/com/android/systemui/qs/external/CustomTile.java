@@ -17,11 +17,14 @@ package com.android.systemui.qs.external;
 
 import android.app.ActivityManager;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.Icon;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.IBinder;
@@ -60,6 +63,7 @@ public class CustomTile extends QSTile<QSTile.State> implements TileChangeListen
     private final IQSTileService mService;
     private final TileServiceManager mServiceManager;
     private final int mUser;
+    private Context mAppContext;
     private android.graphics.drawable.Icon mDefaultIcon;
 
     private boolean mListening;
@@ -71,19 +75,26 @@ public class CustomTile extends QSTile<QSTile.State> implements TileChangeListen
         super(host);
         mWindowManager = WindowManagerGlobal.getWindowManagerService();
         mComponent = ComponentName.unflattenFromString(action);
-        mTile = new Tile(mComponent);
+        mTile = new Tile();
         setTileIcon();
         mServiceManager = host.getTileServices().getTileWrapper(this);
         mService = mServiceManager.getTileService();
         mServiceManager.setTileChangeListener(this);
         mUser = ActivityManager.getCurrentUser();
+        try {
+            mAppContext = mContext.createPackageContext(mComponent.getPackageName(), 0);
+        } catch (NameNotFoundException e) {
+        }
     }
 
     private void setTileIcon() {
         try {
             PackageManager pm = mContext.getPackageManager();
-            ServiceInfo info = pm.getServiceInfo(mComponent,
-                    PackageManager.MATCH_ENCRYPTION_AWARE_AND_UNAWARE);
+            int flags = PackageManager.MATCH_ENCRYPTION_AWARE_AND_UNAWARE;
+            if (isSystemApp(pm)) {
+                flags |= PackageManager.MATCH_DISABLED_COMPONENTS;
+            }
+            ServiceInfo info = pm.getServiceInfo(mComponent, flags);
             int icon = info.icon != 0 ? info.icon
                     : info.applicationInfo.icon;
             // Update the icon if its not set or is the default icon.
@@ -101,6 +112,10 @@ public class CustomTile extends QSTile<QSTile.State> implements TileChangeListen
         } catch (Exception e) {
             mDefaultIcon = null;
         }
+    }
+
+    private boolean isSystemApp(PackageManager pm) throws PackageManager.NameNotFoundException {
+        return pm.getApplicationInfo(mComponent.getPackageName(), 0).isSystemApp();
     }
 
     /**
@@ -271,16 +286,20 @@ public class CustomTile extends QSTile<QSTile.State> implements TileChangeListen
             tileState = Tile.STATE_UNAVAILABLE;
         }
         Drawable drawable;
+        boolean mHasRes = false;
+        android.graphics.drawable.Icon icon = mTile.getIcon();
         try {
-            drawable = mTile.getIcon().loadDrawable(mContext);
+            drawable = icon.loadDrawable(mAppContext);
+            mHasRes = icon.getType() == android.graphics.drawable.Icon.TYPE_RESOURCE;
         } catch (Exception e) {
             Log.w(TAG, "Invalid icon, forcing into unavailable state");
             tileState = Tile.STATE_UNAVAILABLE;
-            drawable = mDefaultIcon.loadDrawable(mContext);
+            drawable = mDefaultIcon.loadDrawable(mAppContext);
         }
         int color = mContext.getColor(getColor(tileState));
         drawable.setTint(color);
-        state.icon = new DrawableIcon(drawable);
+        state.icon = mHasRes ? new DrawableIconWithRes(drawable, icon.getResId())
+                : new DrawableIcon(drawable);
         state.label = mTile.getLabel();
         if (tileState == Tile.STATE_UNAVAILABLE) {
             state.label = new SpannableStringBuilder().append(state.label,

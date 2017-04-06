@@ -292,6 +292,12 @@ public class ApplicationPackageManager extends PackageManager {
     }
 
     @Override
+    public boolean isPermissionReviewModeEnabled() {
+        return mContext.getResources().getBoolean(
+                com.android.internal.R.bool.config_permissionReviewRequired);
+    }
+
+    @Override
     public PermissionGroupInfo getPermissionGroupInfo(String name,
             int flags) throws NameNotFoundException {
         try {
@@ -1245,18 +1251,16 @@ public class ApplicationPackageManager extends PackageManager {
             return mContext.mMainThread.getSystemContext().getResources();
         }
         final boolean sameUid = (app.uid == Process.myUid());
-        try {
-            return mContext.mMainThread.getTopLevelResources(
+        final Resources r = mContext.mMainThread.getTopLevelResources(
                     sameUid ? app.sourceDir : app.publicSourceDir,
                     sameUid ? app.splitSourceDirs : app.splitPublicSourceDirs,
                     app.resourceDirs, app.sharedLibraryFiles, Display.DEFAULT_DISPLAY,
                     mContext.mPackageInfo);
-        } catch (Resources.NotFoundException cause) {
-            final NameNotFoundException ex =
-                    new NameNotFoundException("Unable to open " + app.publicSourceDir);
-            ex.initCause(cause);
-            throw ex;
+        if (r != null) {
+            return r;
         }
+        throw new NameNotFoundException("Unable to open " + app.publicSourceDir);
+
     }
 
     @Override

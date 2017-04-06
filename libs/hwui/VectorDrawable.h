@@ -622,10 +622,15 @@ public:
         }
 
         void setScaledSize(int width, int height) {
-            if (mNonAnimatableProperties.scaledWidth != width
-                    || mNonAnimatableProperties.scaledHeight != height) {
-                mNonAnimatableProperties.scaledWidth = width;
-                mNonAnimatableProperties.scaledHeight = height;
+            // If the requested size is bigger than what the bitmap was, then
+            // we increase the bitmap size to match. The width and height
+            // are bound by MAX_CACHED_BITMAP_SIZE.
+            if (mNonAnimatableProperties.scaledWidth < width
+                    || mNonAnimatableProperties.scaledHeight < height) {
+                mNonAnimatableProperties.scaledWidth = std::max(width,
+                        mNonAnimatableProperties.scaledWidth);
+                mNonAnimatableProperties.scaledHeight = std::max(height,
+                        mNonAnimatableProperties.scaledHeight);
                 mNonAnimatablePropertiesDirty = true;
                 mTree->onPropertyChanged(this);
             }
@@ -673,21 +678,17 @@ public:
     void onPropertyChanged(TreeProperties* prop);
     TreeProperties* mutateStagingProperties() { return &mStagingProperties; }
     const TreeProperties* stagingProperties() const { return &mStagingProperties; }
-    PushStagingFunctor* getFunctor() { return &mFunctor;}
 
     // This should only be called from animations on RT
     TreeProperties* mutateProperties() { return &mProperties; }
 
+    // This should always be called from RT.
+    void markDirty() { mCache.dirty = true; }
+    bool isDirty() const { return mCache.dirty; }
+    bool getPropertyChangeWillBeConsumed() const { return mWillBeConsumed; }
+    void setPropertyChangeWillBeConsumed(bool willBeConsumed) { mWillBeConsumed = willBeConsumed; }
+
 private:
-    class VectorDrawableFunctor : public PushStagingFunctor {
-    public:
-        VectorDrawableFunctor(Tree* tree) : mTree(tree) {}
-        virtual void operator ()() {
-            mTree->syncProperties();
-        }
-    private:
-        Tree* mTree;
-    };
 
     SkPaint* updatePaint(SkPaint* outPaint, TreeProperties* prop);
     bool allocateBitmapIfNeeded(SkBitmap* outCache, int width, int height);
@@ -704,8 +705,6 @@ private:
     TreeProperties mProperties = TreeProperties(this);
     TreeProperties mStagingProperties = TreeProperties(this);
 
-    VectorDrawableFunctor mFunctor = VectorDrawableFunctor(this);
-
     SkPaint mPaint;
     struct Cache {
         SkBitmap bitmap;
@@ -717,6 +716,8 @@ private:
 
     PropertyChangedListener mPropertyChangedListener
             = PropertyChangedListener(&mCache.dirty, &mStagingCache.dirty);
+
+    mutable bool mWillBeConsumed = false;
 };
 
 } // namespace VectorDrawable

@@ -110,6 +110,10 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
     private float mDownY;
     private final float mTouchSlop;
 
+    private float mActivationX;
+    private float mActivationY;
+    private final float mDoubleTapSlop;
+
     private OnActivatedListener mOnActivatedListener;
 
     private final Interpolator mSlowOutFastInInterpolator;
@@ -137,11 +141,13 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
 
     private float mNormalBackgroundVisibilityAmount;
     private ValueAnimator mFadeInFromDarkAnimator;
+    private float mDimmedBackgroundFadeInAmount = -1;
     private ValueAnimator.AnimatorUpdateListener mBackgroundVisibilityUpdater
             = new ValueAnimator.AnimatorUpdateListener() {
         @Override
         public void onAnimationUpdate(ValueAnimator animation) {
             setNormalBackgroundVisibilityAmount(mBackgroundNormal.getAlpha());
+            mDimmedBackgroundFadeInAmount = mBackgroundDimmed.getAlpha();
         }
     };
     private AnimatorListenerAdapter mFadeInEndListener = new AnimatorListenerAdapter() {
@@ -149,6 +155,7 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
         public void onAnimationEnd(Animator animation) {
             super.onAnimationEnd(animation);
             mFadeInFromDarkAnimator = null;
+            mDimmedBackgroundFadeInAmount = -1;
             updateBackground();
         }
     };
@@ -168,6 +175,7 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
     public ActivatableNotificationView(Context context, AttributeSet attrs) {
         super(context, attrs);
         mTouchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
+        mDoubleTapSlop = context.getResources().getDimension(R.dimen.double_tap_slop);
         mSlowOutFastInInterpolator = new PathInterpolator(0.8f, 0.0f, 0.6f, 1.0f);
         mSlowOutLinearInInterpolator = new PathInterpolator(0.8f, 0.0f, 1.0f, 1.0f);
         setClipChildren(false);
@@ -229,7 +237,6 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
             boolean wasActivated = mActivated;
             result = handleTouchEventDimmed(event);
             if (wasActivated && result && event.getAction() == MotionEvent.ACTION_UP) {
-                mFalsingManager.onNotificationDoubleTap();
                 removeCallbacks(mTapTimeoutRunnable);
             }
         } else {
@@ -280,9 +287,21 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
                     if (!mActivated) {
                         makeActive();
                         postDelayed(mTapTimeoutRunnable, DOUBLETAP_TIMEOUT_MS);
+                        mActivationX = event.getX();
+                        mActivationY = event.getY();
                     } else {
-                        if (!performClick()) {
-                            return false;
+                        boolean withinDoubleTapSlop = isWithinDoubleTapSlop(event);
+                        mFalsingManager.onNotificationDoubleTap(
+                                withinDoubleTapSlop,
+                                event.getX() - mActivationX,
+                                event.getY() - mActivationY);
+                        if (withinDoubleTapSlop) {
+                            if (!performClick()) {
+                                return false;
+                            }
+                        } else {
+                            makeInactive(true /* animate */);
+                            mTrackTouch = false;
                         }
                     }
                 } else {
@@ -388,6 +407,16 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
     private boolean isWithinTouchSlop(MotionEvent event) {
         return Math.abs(event.getX() - mDownX) < mTouchSlop
                 && Math.abs(event.getY() - mDownY) < mTouchSlop;
+    }
+
+    private boolean isWithinDoubleTapSlop(MotionEvent event) {
+        if (!mActivated) {
+            // If we're not activated there's no double tap slop to satisfy.
+            return true;
+        }
+
+        return Math.abs(event.getX() - mActivationX) < mDoubleTapSlop
+                && Math.abs(event.getY() - mActivationY) < mDoubleTapSlop;
     }
 
     public void setDimmed(boolean dimmed, boolean fade) {
@@ -590,6 +619,9 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
             public void onAnimationEnd(Animator animation) {
                 updateBackground();
                 mBackgroundAnimator = null;
+                if (mFadeInFromDarkAnimator == null) {
+                    mDimmedBackgroundFadeInAmount = -1;
+                }
             }
         });
         mBackgroundAnimator.addUpdateListener(mBackgroundVisibilityUpdater);
@@ -597,7 +629,10 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
     }
 
     protected void updateBackgroundAlpha(float transformationAmount) {
-        mBgAlpha = isChildInGroup() && mDimmed ? transformationAmount : 1f;
+        mBgAlpha =  isChildInGroup() && mDimmed ? transformationAmount : 1f;
+        if (mDimmedBackgroundFadeInAmount != -1) {
+            mBgAlpha *= mDimmedBackgroundFadeInAmount;
+        }
         mBackgroundDimmed.setAlpha(mBgAlpha);
     }
 
@@ -738,6 +773,7 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
                 }
                 if (!mWasCancelled) {
                     enableAppearDrawing(false);
+                    onAppearAnimationFinished(isAppearing);
                 }
             }
 
@@ -752,6 +788,9 @@ public abstract class ActivatableNotificationView extends ExpandableOutlineView 
             }
         });
         mAppearAnimator.start();
+    }
+
+    protected void onAppearAnimationFinished(boolean wasAppearing) {
     }
 
     private void cancelAppearAnimation() {

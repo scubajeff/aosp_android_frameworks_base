@@ -53,7 +53,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.util.List;
 
 /**
- * Accessibility services are intended to assist users with disabilities in using
+ * Accessibility services should only be used to assist users with disabilities in using
  * Android devices and apps. They run in the background and receive callbacks by the system
  * when {@link AccessibilityEvent}s are fired. Such events denote some state transition
  * in the user interface, for example, the focus has changed, a button has been clicked,
@@ -334,7 +334,8 @@ public abstract class AccessibilityService extends Service {
     public static final int GLOBAL_ACTION_HOME = 2;
 
     /**
-     * Action to toggle showing the overview of recent apps
+     * Action to toggle showing the overview of recent apps. Will fail on platforms that don't
+     * show recent apps.
      */
     public static final int GLOBAL_ACTION_RECENTS = 3;
 
@@ -628,8 +629,8 @@ public abstract class AccessibilityService extends Service {
         if (connection == null) {
             return false;
         }
-        List<MotionEvent> events = MotionEventGenerator.getMotionEventsFromGestureDescription(
-                gesture, 100);
+        List<GestureDescription.GestureStep> steps =
+                MotionEventGenerator.getGestureStepsFromGestureDescription(gesture, 100);
         try {
             synchronized (mLock) {
                 mGestureStatusCallbackSequence++;
@@ -641,8 +642,8 @@ public abstract class AccessibilityService extends Service {
                             callback, handler);
                     mGestureStatusCallbackInfos.put(mGestureStatusCallbackSequence, callbackInfo);
                 }
-                connection.sendMotionEvents(mGestureStatusCallbackSequence,
-                        new ParceledListSlice<>(events));
+                connection.sendGesture(mGestureStatusCallbackSequence,
+                        new ParceledListSlice<>(steps));
             }
         } catch (RemoteException re) {
             throw new RuntimeException(re);

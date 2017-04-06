@@ -34,7 +34,6 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -343,7 +342,6 @@ public class NotificationData {
                         entry.notification.setOverrideGroupKey(overrideGroupKey);
                         mGroupManager.onEntryUpdated(entry, oldSbn);
                     }
-                    //mGroupManager.onEntryBundlingUpdated(entry, getOverrideGroupKey(entry.key));
                 }
             }
         }
@@ -392,20 +390,6 @@ public class NotificationData {
         if (!BaseStatusBar.ENABLE_CHILD_NOTIFICATIONS
                 && mGroupManager.isChildInGroupWithSummary(sbn)) {
             return true;
-        }
-        return false;
-    }
-
-    /**
-     * Return whether there are any clearable notifications (that aren't errors).
-     */
-    public boolean hasActiveClearableNotifications() {
-        for (Entry e : mSortedAndFiltered) {
-            if (e.getContentView() != null) { // the view successfully inflated
-                if (e.notification.isClearable()) {
-                    return true;
-                }
-            }
         }
         return false;
     }

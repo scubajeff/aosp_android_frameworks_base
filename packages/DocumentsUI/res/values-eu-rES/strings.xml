@@ -16,7 +16,7 @@
 
 <resources xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-    <string name="app_label" msgid="2783841764617238354">"Dokumentuak"</string>
+    <string name="app_label" msgid="1551050262492398204">"Fitxategiak"</string>
     <string name="downloads_label" msgid="959113951084633612">"Deskargak"</string>
     <string name="title_open" msgid="4353228937663917801">"Ireki hemendik"</string>
     <string name="title_save" msgid="2433679664882857999">"Gorde hemen"</string>
@@ -59,7 +59,7 @@
     <string name="root_type_shortcut" msgid="3318760609471618093">"Lasterbideak"</string>
     <string name="root_type_device" msgid="7121342474653483538">"Gailuak"</string>
     <string name="root_type_apps" msgid="8838065367985945189">"Aplikazio gehiago"</string>
-    <string name="empty" msgid="7858882803708117596">"Ez dago elementurik"</string>
+    <string name="empty" msgid="7858882803708117596">"Ez dago ezer"</string>
     <string name="no_results" msgid="6622510343880730446">"Ez da aurkitu ezer %1$s atalean"</string>
     <string name="toast_no_application" msgid="4632640357724698144">"Ezin da ireki fitxategia"</string>
     <string name="toast_failed_delete" msgid="2180678019407244069">"Ezin izan dira dokumentu batzuk ezabatu"</string>

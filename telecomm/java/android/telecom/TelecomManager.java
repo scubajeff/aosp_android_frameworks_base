@@ -314,6 +314,15 @@ public class TelecomManager {
     public static final String EXTRA_CALL_BACK_NUMBER = "android.telecom.extra.CALL_BACK_NUMBER";
 
     /**
+     * The number of milliseconds that Telecom should wait after disconnecting a call via the
+     * ACTION_NEW_OUTGOING_CALL broadcast, in order to wait for the app which cancelled the call
+     * to make a new one.
+     * @hide
+     */
+    public static final String EXTRA_NEW_OUTGOING_CALL_CANCEL_TIMEOUT =
+            "android.telecom.extra.NEW_OUTGOING_CALL_CANCEL_TIMEOUT";
+
+    /**
      * A boolean meta-data value indicating whether an {@link InCallService} implements an
      * in-call user interface. Dialer implementations (see {@link #getDefaultDialerPackage()}) which
      * would also like to replace the in-call interface should set this meta-data to {@code true} in
@@ -348,7 +357,6 @@ public class TelecomManager {
      * informed of external calls should set this meta-data to {@code true} in the manifest
      * registration of their {@link InCallService}.  By default, the {@link InCallService} will NOT
      * be informed of external calls.
-     * @hide
      */
     public static final String METADATA_INCLUDE_EXTERNAL_CALLS =
             "android.telecom.INCLUDE_EXTERNAL_CALLS";
@@ -1444,9 +1452,9 @@ public class TelecomManager {
      */
     @SystemApi
     @RequiresPermission(Manifest.permission.DUMP)
-    public List<ParcelableCallAnalytics> dumpAnalytics() {
+    public TelecomAnalytics dumpAnalytics() {
         ITelecomService service = getTelecomService();
-        List<ParcelableCallAnalytics> result = null;
+        TelecomAnalytics result = null;
         if (service != null) {
             try {
                 result = service.dumpCallAnalytics();

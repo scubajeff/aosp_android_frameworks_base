@@ -47,9 +47,9 @@ public final class Prefs {
         Key.QS_DATA_SAVER_DIALOG_SHOWN,
         Key.QS_INVERT_COLORS_ADDED,
         Key.QS_WORK_ADDED,
-        Key.QS_NIGHT_ADDED,
     })
     public @interface Key {
+        @Deprecated
         String OVERVIEW_LAST_STACK_TASK_ACTIVE_TIME = "OverviewLastStackTaskActiveTime";
         String DEBUG_MODE_ENABLED = "debugModeEnabled";
         String HOTSPOT_TILE_LAST_USED = "HotspotTileLastUsed";
@@ -67,7 +67,6 @@ public final class Prefs {
         String QS_DATA_SAVER_DIALOG_SHOWN = "QsDataSaverDialogShown";
         String QS_INVERT_COLORS_ADDED = "QsInvertColorsAdded";
         String QS_WORK_ADDED = "QsWorkAdded";
-        String QS_NIGHT_ADDED = "QsNightAdded";
     }
 
     public static boolean getBoolean(Context context, @Key String key, boolean defaultValue) {

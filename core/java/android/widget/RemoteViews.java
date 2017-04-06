@@ -390,6 +390,7 @@ public class RemoteViews implements Parcelable, Filter {
         // Because pruning can remove the need for bitmaps, we reconstruct the bitmap cache
         mBitmapCache = new BitmapCache();
         setBitmapCache(mBitmapCache);
+        recalculateMemoryUsage();
     }
 
     private class SetEmptyView extends Action {
@@ -2057,26 +2058,8 @@ public class RemoteViews implements Parcelable, Filter {
             return mMemoryUsage;
         }
 
-        @SuppressWarnings("deprecation")
         public void addBitmapMemory(Bitmap b) {
-            final Bitmap.Config c = b.getConfig();
-            // If we don't know, be pessimistic and assume 4
-            int bpp = 4;
-            if (c != null) {
-                switch (c) {
-                    case ALPHA_8:
-                        bpp = 1;
-                        break;
-                    case RGB_565:
-                    case ARGB_4444:
-                        bpp = 2;
-                        break;
-                    case ARGB_8888:
-                        bpp = 4;
-                        break;
-                }
-            }
-            increment(b.getWidth() * b.getHeight() * bpp);
+            increment(b.getAllocationByteCount());
         }
 
         int mMemoryUsage;
@@ -2659,8 +2642,8 @@ public class RemoteViews implements Parcelable, Filter {
      *
      * When setting the on-click action of items within collections (eg. {@link ListView},
      * {@link StackView} etc.), this method will not work. Instead, use {@link
-     * RemoteViews#setPendingIntentTemplate(int, PendingIntent) in conjunction with
-     * RemoteViews#setOnClickFillInIntent(int, Intent).
+     * RemoteViews#setPendingIntentTemplate(int, PendingIntent)} in conjunction with
+     * {@link RemoteViews#setOnClickFillInIntent(int, Intent)}.
      *
      * @param viewId The id of the view that will trigger the {@link PendingIntent} when clicked
      * @param pendingIntent The {@link PendingIntent} to send when user clicks
@@ -2785,6 +2768,18 @@ public class RemoteViews implements Parcelable, Filter {
      */
     public void setTextColor(int viewId, @ColorInt int color) {
         setInt(viewId, "setTextColor", color);
+    }
+
+    /**
+     * @hide
+     * Equivalent to calling {@link android.widget.TextView#setTextColor(ColorStateList)}.
+     *
+     * @param viewId The id of the view whose text color should change
+     * @param colors the text colors to set
+     */
+    public void setTextColor(int viewId, @ColorInt ColorStateList colors) {
+        addAction(new ReflectionAction(viewId, "setTextColor", ReflectionAction.COLOR_STATE_LIST,
+                colors));
     }
 
     /**
@@ -3195,7 +3190,9 @@ public class RemoteViews implements Parcelable, Filter {
         // we don't add a filter to the static version returned by getSystemService.
         inflater = inflater.cloneInContext(inflationContext);
         inflater.setFilter(this);
-        return inflater.inflate(rv.getLayoutId(), parent, false);
+        View v = inflater.inflate(rv.getLayoutId(), parent, false);
+        v.setTagInternal(R.id.widget_frame, rv.getLayoutId());
+        return v;
     }
 
     private static void loadTransitionOverride(Context context,
@@ -3231,7 +3228,7 @@ public class RemoteViews implements Parcelable, Filter {
      * Applies the views asynchronously, moving as much of the task on the background
      * thread as possible.
      *
-     * @see {@link #apply(Context, ViewGroup)}
+     * @see #apply(Context, ViewGroup)
      * @param context Default context to use
      * @param parent Parent that the resulting view hierarchy will be attached to. This method
      * does <strong>not</strong> attach the hierarchy. The caller should do so when appropriate.
@@ -3373,7 +3370,7 @@ public class RemoteViews implements Parcelable, Filter {
         // across orientation change, and has the RemoteViews re-applied in the new orientation,
         // we throw an exception, since the layouts may be completely unrelated.
         if (hasLandscapeAndPortraitLayouts()) {
-            if (v.getId() != rvToApply.getLayoutId()) {
+            if ((Integer) v.getTag(R.id.widget_frame) != rvToApply.getLayoutId()) {
                 throw new RuntimeException("Attempting to re-apply RemoteViews to a view that" +
                         " that does not share the same root layout id.");
             }
@@ -3386,7 +3383,7 @@ public class RemoteViews implements Parcelable, Filter {
      * Applies all the actions to the provided view, moving as much of the task on the background
      * thread as possible.
      *
-     * @see {@link #reapply(Context, View)}
+     * @see #reapply(Context, View)
      * @param context Default context to use
      * @param v The view to apply the actions to.  This should be the result of
      * the {@link #apply(Context,ViewGroup)} call.
@@ -3409,7 +3406,7 @@ public class RemoteViews implements Parcelable, Filter {
         // across orientation change, and has the RemoteViews re-applied in the new orientation,
         // we throw an exception, since the layouts may be completely unrelated.
         if (hasLandscapeAndPortraitLayouts()) {
-            if (v.getId() != rvToApply.getLayoutId()) {
+            if ((Integer) v.getTag(R.id.widget_frame) != rvToApply.getLayoutId()) {
                 throw new RuntimeException("Attempting to re-apply RemoteViews to a view that" +
                         " that does not share the same root layout id.");
             }

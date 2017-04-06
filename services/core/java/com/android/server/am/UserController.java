@@ -46,6 +46,7 @@ import static com.android.server.am.UserState.STATE_RUNNING_UNLOCKING;
 import android.annotation.NonNull;
 import android.annotation.UserIdInt;
 import android.app.ActivityManager;
+import android.app.AppGlobals;
 import android.app.AppOpsManager;
 import android.app.Dialog;
 import android.app.IStopUserCallback;
@@ -54,6 +55,7 @@ import android.app.KeyguardManager;
 import android.content.Context;
 import android.content.IIntentReceiver;
 import android.content.Intent;
+import android.content.pm.IPackageManager;
 import android.content.pm.PackageManager;
 import android.content.pm.UserInfo;
 import android.os.BatteryStats;
@@ -76,6 +78,7 @@ import android.os.UserManager;
 import android.os.UserManagerInternal;
 import android.os.storage.IMountService;
 import android.os.storage.StorageManager;
+import android.util.ArraySet;
 import android.util.IntArray;
 import android.util.Pair;
 import android.util.Slog;
@@ -86,6 +89,7 @@ import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.util.ArrayUtils;
+import com.android.internal.util.Preconditions;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.server.LocalServices;
 import com.android.server.pm.UserManagerService;
@@ -97,6 +101,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Helper class for {@link ActivityManagerService} responsible for multi-user functionality.
@@ -109,7 +114,7 @@ final class UserController {
 
     // Amount of time we wait for observers to handle a user switch before
     // giving up on them and unfreezing the screen.
-    static final int USER_SWITCH_TIMEOUT = 2 * 1000;
+    static final int USER_SWITCH_TIMEOUT = 3 * 1000;
 
     private final ActivityManagerService mService;
     private final Handler mHandler;
@@ -151,9 +156,9 @@ final class UserController {
             = new RemoteCallbackList<>();
 
     /**
-     * Currently active user switch.
+     * Currently active user switch callbacks.
      */
-    Object mCurUserSwitchCallback;
+    private volatile ArraySet<String> mCurWaitingUserSwitchCallbacks;
 
     private volatile UserManagerService mUserManager;
 
@@ -224,6 +229,7 @@ final class UserController {
 
     private void finishUserBoot(UserState uss, IIntentReceiver resultTo) {
         final int userId = uss.mHandle.getIdentifier();
+
         Slog.d(TAG, "Finishing user boot " + userId);
         synchronized (mService) {
             // Bail if we ended up with a stale user
@@ -235,11 +241,14 @@ final class UserController {
             // storage is already unlocked.
             if (uss.setState(STATE_BOOTING, STATE_RUNNING_LOCKED)) {
                 getUserManagerInternal().setUserState(userId, uss.state);
-
-                int uptimeSeconds = (int)(SystemClock.elapsedRealtime() / 1000);
-                MetricsLogger.histogram(mService.mContext, "framework_locked_boot_completed",
-                    uptimeSeconds);
-
+                // Do not report secondary users, runtime restarts or first boot/upgrade
+                if (userId == UserHandle.USER_SYSTEM
+                        && !mService.mSystemServiceManager.isRuntimeRestarted()
+                        && !isFirstBootOrUpgrade()) {
+                    int uptimeSeconds = (int)(SystemClock.elapsedRealtime() / 1000);
+                    MetricsLogger.histogram(mService.mContext, "framework_locked_boot_completed",
+                            uptimeSeconds);
+                }
                 Intent intent = new Intent(Intent.ACTION_LOCKED_BOOT_COMPLETED, null);
                 intent.putExtra(Intent.EXTRA_USER_HANDLE, userId);
                 intent.addFlags(Intent.FLAG_RECEIVER_NO_ABORT
@@ -275,6 +284,7 @@ final class UserController {
      */
     private void finishUserUnlocking(final UserState uss) {
         final int userId = uss.mHandle.getIdentifier();
+        boolean proceedWithUnlock = false;
         synchronized (mService) {
             // Bail if we ended up with a stale user
             if (mStartedUsers.get(uss.mHandle.getIdentifier()) != uss) return;
@@ -284,19 +294,23 @@ final class UserController {
 
             if (uss.setState(STATE_RUNNING_LOCKED, STATE_RUNNING_UNLOCKING)) {
                 getUserManagerInternal().setUserState(userId, uss.state);
-                uss.mUnlockProgress.start();
-
-                // Prepare app storage before we go any further
-                uss.mUnlockProgress.setProgress(5,
-                        mService.mContext.getString(R.string.android_start_title));
-                mUserManager.onBeforeUnlockUser(userId);
-                uss.mUnlockProgress.setProgress(20);
-
-                // Dispatch unlocked to system services; when fully dispatched,
-                // that calls through to the next "unlocked" phase
-                mHandler.obtainMessage(SYSTEM_USER_UNLOCK_MSG, userId, 0, uss)
-                        .sendToTarget();
+                proceedWithUnlock = true;
             }
+        }
+
+        if (proceedWithUnlock) {
+            uss.mUnlockProgress.start();
+
+            // Prepare app storage before we go any further
+            uss.mUnlockProgress.setProgress(5,
+                    mService.mContext.getString(R.string.android_start_title));
+            mUserManager.onBeforeUnlockUser(userId);
+            uss.mUnlockProgress.setProgress(20);
+
+            // Dispatch unlocked to system services; when fully dispatched,
+            // that calls through to the next "unlocked" phase
+            mHandler.obtainMessage(SYSTEM_USER_UNLOCK_MSG, userId, 0, uss)
+                    .sendToTarget();
         }
     }
 
@@ -347,7 +361,17 @@ final class UserController {
                 // PRE_BOOT receivers are finished to avoid ANR'ing apps
                 final UserInfo info = getUserInfo(userId);
                 if (!Objects.equals(info.lastLoggedInFingerprint, Build.FINGERPRINT)) {
-                    new PreBootBroadcaster(mService, userId, null) {
+                    // Suppress double notifications for managed profiles that
+                    // were unlocked automatically as part of their parent user
+                    // being unlocked.
+                    final boolean quiet;
+                    if (info.isManagedProfile()) {
+                        quiet = !uss.tokenProvided
+                                || !mLockPatternUtils.isSeparateProfileChallengeEnabled(userId);
+                    } else {
+                        quiet = false;
+                    }
+                    new PreBootBroadcaster(mService, userId, null, quiet) {
                         @Override
                         public void onFinished() {
                             finishUserUnlockedCompleted(uss);
@@ -396,8 +420,14 @@ final class UserController {
             }
 
             Slog.d(TAG, "Sending BOOT_COMPLETE user #" + userId);
-            int uptimeSeconds = (int)(SystemClock.elapsedRealtime() / 1000);
-            MetricsLogger.histogram(mService.mContext, "framework_boot_completed", uptimeSeconds);
+            // Do not report secondary users, runtime restarts or first boot/upgrade
+            if (userId == UserHandle.USER_SYSTEM
+                    && !mService.mSystemServiceManager.isRuntimeRestarted()
+                    && !isFirstBootOrUpgrade()) {
+                int uptimeSeconds = (int) (SystemClock.elapsedRealtime() / 1000);
+                MetricsLogger
+                        .histogram(mService.mContext, "framework_boot_completed", uptimeSeconds);
+            }
             final Intent bootIntent = new Intent(Intent.ACTION_BOOT_COMPLETED, null);
             bootIntent.putExtra(Intent.EXTRA_USER_HANDLE, userId);
             bootIntent.addFlags(Intent.FLAG_RECEIVER_NO_ABORT
@@ -405,6 +435,15 @@ final class UserController {
             mService.broadcastIntentLocked(null, null, bootIntent, null, null, 0, null, null,
                     new String[] { android.Manifest.permission.RECEIVE_BOOT_COMPLETED },
                     AppOpsManager.OP_NONE, null, true, false, MY_PID, SYSTEM_UID, userId);
+        }
+    }
+
+    private static boolean isFirstBootOrUpgrade() {
+        IPackageManager pm = AppGlobals.getPackageManager();
+        try {
+            return pm.isFirstBoot() || pm.isUpgrade();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
         }
     }
 
@@ -948,6 +987,7 @@ final class UserController {
 
     boolean unlockUserCleared(final int userId, byte[] token, byte[] secret,
             IProgressListener listener) {
+        UserState uss;
         synchronized (mService) {
             // TODO Move this block outside of synchronized if it causes lock contention
             if (!StorageManager.isUserKeyUnlocked(userId)) {
@@ -962,15 +1002,20 @@ final class UserController {
             }
             // Bail if user isn't actually running, otherwise register the given
             // listener to watch for unlock progress
-            final UserState uss = mStartedUsers.get(userId);
+            uss = mStartedUsers.get(userId);
             if (uss == null) {
                 notifyFinished(userId, listener);
                 return false;
             } else {
                 uss.mUnlockProgress.addListener(listener);
+                uss.tokenProvided = (token != null);
             }
+        }
 
-            finishUserUnlocking(uss);
+        finishUserUnlocking(uss);
+
+        final ArraySet<Integer> childProfilesToUnlock = new ArraySet<>();
+        synchronized (mService) {
 
             // We just unlocked a user, so let's now attempt to unlock any
             // managed profiles under that user.
@@ -980,9 +1025,14 @@ final class UserController {
                 if (parent != null && parent.id == userId && testUserId != userId) {
                     Slog.d(TAG, "User " + testUserId + " (parent " + parent.id
                             + "): attempting unlock because parent was just unlocked");
-                    maybeUnlockUser(testUserId);
+                    childProfilesToUnlock.add(testUserId);
                 }
             }
+        }
+
+        final int size = childProfilesToUnlock.size();
+        for (int i = 0; i < size; i++) {
+            maybeUnlockUser(childProfilesToUnlock.valueAt(i));
         }
 
         return true;
@@ -1039,7 +1089,8 @@ final class UserController {
 
     void timeoutUserSwitch(UserState uss, int oldUserId, int newUserId) {
         synchronized (mService) {
-            Slog.wtf(TAG, "User switch timeout: from " + oldUserId + " to " + newUserId);
+            Slog.wtf(TAG, "User switch timeout: from " + oldUserId + " to " + newUserId
+                    + ". Observers that didn't send results: " + mCurWaitingUserSwitchCallbacks);
             sendContinueUserSwitchLocked(uss, oldUserId, newUserId);
         }
     }
@@ -1048,28 +1099,43 @@ final class UserController {
         Slog.d(TAG, "Dispatch onUserSwitching oldUser #" + oldUserId + " newUser #" + newUserId);
         final int observerCount = mUserSwitchObservers.beginBroadcast();
         if (observerCount > 0) {
-            final IRemoteCallback callback = new IRemoteCallback.Stub() {
-                int mCount = 0;
-                @Override
-                public void sendResult(Bundle data) throws RemoteException {
-                    synchronized (mService) {
-                        if (mCurUserSwitchCallback == this) {
-                            mCount++;
-                            if (mCount == observerCount) {
-                                sendContinueUserSwitchLocked(uss, oldUserId, newUserId);
-                            }
-                        }
-                    }
-                }
-            };
+            final ArraySet<String> curWaitingUserSwitchCallbacks = new ArraySet<>();
             synchronized (mService) {
                 uss.switching = true;
-                mCurUserSwitchCallback = callback;
+                mCurWaitingUserSwitchCallbacks = curWaitingUserSwitchCallbacks;
             }
+            final AtomicInteger waitingCallbacksCount = new AtomicInteger(observerCount);
+            final long dispatchStartedTime = SystemClock.elapsedRealtime();
             for (int i = 0; i < observerCount; i++) {
                 try {
-                    mUserSwitchObservers.getBroadcastItem(i).onUserSwitching(
-                            newUserId, callback);
+                    // Prepend with unique prefix to guarantee that keys are unique
+                    final String name = "#" + i + " " + mUserSwitchObservers.getBroadcastCookie(i);
+                    synchronized (mService) {
+                        curWaitingUserSwitchCallbacks.add(name);
+                    }
+                    final IRemoteCallback callback = new IRemoteCallback.Stub() {
+                        @Override
+                        public void sendResult(Bundle data) throws RemoteException {
+                            synchronized (mService) {
+                                long delay = SystemClock.elapsedRealtime() - dispatchStartedTime;
+                                if (delay > USER_SWITCH_TIMEOUT) {
+                                    Slog.wtf(TAG, "User switch timeout: observer "  + name
+                                            + " sent result after " + delay + " ms");
+                                }
+                                // Early return if this session is no longer valid
+                                if (curWaitingUserSwitchCallbacks
+                                        != mCurWaitingUserSwitchCallbacks) {
+                                    return;
+                                }
+                                curWaitingUserSwitchCallbacks.remove(name);
+                                // Continue switching if all callbacks have been notified
+                                if (waitingCallbacksCount.decrementAndGet() == 0) {
+                                    sendContinueUserSwitchLocked(uss, oldUserId, newUserId);
+                                }
+                            }
+                        }
+                    };
+                    mUserSwitchObservers.getBroadcastItem(i).onUserSwitching(newUserId, callback);
                 } catch (RemoteException e) {
                 }
             }
@@ -1082,7 +1148,7 @@ final class UserController {
     }
 
     void sendContinueUserSwitchLocked(UserState uss, int oldUserId, int newUserId) {
-        mCurUserSwitchCallback = null;
+        mCurWaitingUserSwitchCallbacks = null;
         mHandler.removeMessages(USER_SWITCH_TIMEOUT_MSG);
         mHandler.sendMessage(mHandler.obtainMessage(ActivityManagerService.CONTINUE_USER_SWITCH_MSG,
                 oldUserId, newUserId, uss));
@@ -1247,7 +1313,8 @@ final class UserController {
                 ? getCurrentUserIdLocked(): userId;
     }
 
-    void registerUserSwitchObserver(IUserSwitchObserver observer) {
+    void registerUserSwitchObserver(IUserSwitchObserver observer, String name) {
+        Preconditions.checkNotNull(name, "Observer name cannot be null");
         if (mService.checkCallingPermission(INTERACT_ACROSS_USERS_FULL)
                 != PackageManager.PERMISSION_GRANTED) {
             final String msg = "Permission Denial: registerUserSwitchObserver() from pid="
@@ -1257,8 +1324,7 @@ final class UserController {
             Slog.w(TAG, msg);
             throw new SecurityException(msg);
         }
-
-        mUserSwitchObservers.register(observer);
+        mUserSwitchObservers.register(observer, name);
     }
 
     void unregisterUserSwitchObserver(IUserSwitchObserver observer) {
@@ -1453,6 +1519,9 @@ final class UserController {
     }
 
     boolean isSameProfileGroup(int callingUserId, int targetUserId) {
+        if (callingUserId == targetUserId) {
+            return true;
+        }
         synchronized (mUserProfileGroupIdsSelfLocked) {
             int callingProfile = mUserProfileGroupIdsSelfLocked.get(callingUserId,
                     UserInfo.NO_PROFILE_GROUP_ID);

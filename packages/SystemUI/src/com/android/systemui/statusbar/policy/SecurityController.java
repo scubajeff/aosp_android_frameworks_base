@@ -21,8 +21,11 @@ public interface SecurityController {
     boolean hasProfileOwner();
     String getDeviceOwnerName();
     String getProfileOwnerName();
+    boolean isNetworkLoggingEnabled();
     boolean isVpnEnabled();
     boolean isVpnRestricted();
+    /** Whether the VPN app should use branded VPN iconography.  */
+    boolean isVpnBranded();
     String getPrimaryVpnName();
     String getProfileVpnName();
     void onUserSwitched(int newUserId);

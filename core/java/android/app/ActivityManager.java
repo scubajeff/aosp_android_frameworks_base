@@ -75,7 +75,39 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Interact with the overall activities running in the system.
+ * <p>
+ * This class gives information about, and interacts
+ * with, activities, services, and the containing
+ * process.
+ * </p>
+ *
+ * <p>
+ * A number of the methods in this class are for
+ * debugging or informational purposes and they should
+ * not be used to affect any runtime behavior of
+ * your app. These methods are called out as such in
+ * the method level documentation.
+ * </p>
+ *
+ *<p>
+ * Most application developers should not have the need to
+ * use this class, most of whose methods are for specialized
+ * use cases. However, a few methods are more broadly applicable.
+ * For instance, {@link android.app.ActivityManager#isLowRamDevice() isLowRamDevice()}
+ * enables your app to detect whether it is running on a low-memory device,
+ * and behave accordingly.
+ * {@link android.app.ActivityManager#clearApplicationUserData() clearApplicationUserData()}
+ * is for apps with reset-data functionality.
+ * </p>
+ *
+ * <p>
+ * In some special use cases, where an app interacts with
+ * its Task stack, the app may use the
+ * {@link android.app.ActivityManager.AppTask} and
+ * {@link android.app.ActivityManager.RecentTaskInfo} inner
+ * classes. However, in general, the methods in this class should
+ * be used for testing and debugging purposes only.
+ * </p>
  */
 public class ActivityManager {
     private static String TAG = "ActivityManager";
@@ -93,7 +125,9 @@ public class ActivityManager {
     @IntDef({
             BUGREPORT_OPTION_FULL,
             BUGREPORT_OPTION_INTERACTIVE,
-            BUGREPORT_OPTION_REMOTE
+            BUGREPORT_OPTION_REMOTE,
+            BUGREPORT_OPTION_WEAR,
+            BUGREPORT_OPTION_TELEPHONY
     })
     public @interface BugreportMode {}
     /**
@@ -114,6 +148,18 @@ public class ActivityManager {
      * @hide
      */
     public static final int BUGREPORT_OPTION_REMOTE = 2;
+    /**
+     * Takes a bugreport on a wearable device.
+     * @hide
+     */
+    public static final int BUGREPORT_OPTION_WEAR = 3;
+
+    /**
+     * Takes a lightweight version of bugreport that only includes a few, urgent sections
+     * used to report telephony bugs.
+     * @hide
+     */
+    public static final int BUGREPORT_OPTION_TELEPHONY = 4;
 
     /**
      * <a href="{@docRoot}guide/topics/manifest/meta-data-element.html">{@code
@@ -2137,13 +2183,13 @@ public class ActivityManager {
         public static final int FLAG_FOREGROUND = 1<<1;
 
         /**
-         * Bit for {@link #flags): set if the service is running in a
+         * Bit for {@link #flags}: set if the service is running in a
          * core system process.
          */
         public static final int FLAG_SYSTEM_PROCESS = 1<<2;
 
         /**
-         * Bit for {@link #flags): set if the service is running in a
+         * Bit for {@link #flags}: set if the service is running in a
          * persistent process.
          */
         public static final int FLAG_PERSISTENT_PROCESS = 1<<3;
@@ -3621,6 +3667,24 @@ public class ActivityManager {
             return ActivityManagerNative.getDefault().getLockTaskModeState();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Enable more aggressive scheduling for latency-sensitive low-runtime VR threads. Only one
+     * thread can be a VR thread in a process at a time, and that thread may be subject to
+     * restrictions on the amount of time it can run.
+     *
+     * To reset the VR thread for an application, a tid of 0 can be passed.
+     *
+     * @see android.os.Process#myTid()
+     * @param tid tid of the VR thread
+     */
+    public static void setVrThread(int tid) {
+        try {
+            ActivityManagerNative.getDefault().setVrThread(tid);
+        } catch (RemoteException e) {
+            // pass
         }
     }
 

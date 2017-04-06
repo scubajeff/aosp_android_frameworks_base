@@ -12,6 +12,7 @@ LOCAL_MODULE_TAGS := tests
 LOCAL_SRC_FILES := $(call all-java-files-under, src)
 
 LOCAL_STATIC_JAVA_LIBRARIES := \
+    frameworks-base-testutils \
     services.core \
     services.devicepolicy \
     services.net \
@@ -19,7 +20,9 @@ LOCAL_STATIC_JAVA_LIBRARIES := \
     easymocklib \
     guava \
     android-support-test \
-    mockito-target
+    mockito-target \
+    ShortcutManagerTestUtils \
+    truth-prebuilt
 
 LOCAL_JAVA_LIBRARIES := android.test.runner
 
@@ -43,6 +46,11 @@ LOCAL_JNI_SHARED_LIBRARIES := libservicestestsjni \
     libutils
 
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
+
+# Code coverage puts us over the dex limit, so enable multi-dex for coverage-enabled builds
+ifeq (true,$(EMMA_INSTRUMENT))
+LOCAL_JACK_FLAGS := --multi-dex native
+endif # EMMA_INSTRUMENT_STATIC
 
 include $(BUILD_PACKAGE)
 

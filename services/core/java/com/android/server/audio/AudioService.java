@@ -1130,8 +1130,11 @@ public class AudioService extends IAudioService.Stub {
         final int currentUser = getCurrentUserId();
 
         // Check the current user restriction.
-        boolean masterMute = mUserManagerInternal.getUserRestriction(
-                    currentUser, UserManager.DISALLOW_ADJUST_VOLUME);
+        boolean masterMute =
+                mUserManagerInternal.getUserRestriction(currentUser,
+                        UserManager.DISALLLOW_UNMUTE_DEVICE)
+                        || mUserManagerInternal.getUserRestriction(currentUser,
+                        UserManager.DISALLOW_ADJUST_VOLUME);
         if (mUseFixedVolume) {
             masterMute = false;
             AudioSystem.setMasterVolume(1.0f);
@@ -4032,21 +4035,23 @@ public class AudioService extends IAudioService.Stub {
                 mIndexMap.put(device, index);
 
                 changed = oldIndex != index;
-                if (changed) {
-                    // Apply change to all streams using this one as alias
-                    // if changing volume of current device, also change volume of current
-                    // device on aliased stream
-                    boolean currentDevice = (device == getDeviceForStream(mStreamType));
-                    int numStreamTypes = AudioSystem.getNumStreamTypes();
-                    for (int streamType = numStreamTypes - 1; streamType >= 0; streamType--) {
-                        if (streamType != mStreamType &&
-                                mStreamVolumeAlias[streamType] == mStreamType) {
-                            int scaledIndex = rescaleIndex(index, mStreamType, streamType);
-                            mStreamStates[streamType].setIndex(scaledIndex, device, caller);
-                            if (currentDevice) {
-                                mStreamStates[streamType].setIndex(scaledIndex,
-                                        getDeviceForStream(streamType), caller);
-                            }
+                // Apply change to all streams using this one as alias if:
+                // - the index actually changed OR
+                // - there is no volume index stored for this device on alias stream.
+                // If changing volume of current device, also change volume of current
+                // device on aliased stream
+                final boolean currentDevice = (device == getDeviceForStream(mStreamType));
+                final int numStreamTypes = AudioSystem.getNumStreamTypes();
+                for (int streamType = numStreamTypes - 1; streamType >= 0; streamType--) {
+                    final VolumeStreamState aliasStreamState = mStreamStates[streamType];
+                    if (streamType != mStreamType &&
+                            mStreamVolumeAlias[streamType] == mStreamType &&
+                            (changed || !aliasStreamState.hasIndexForDevice(device))) {
+                        final int scaledIndex = rescaleIndex(index, mStreamType, streamType);
+                        aliasStreamState.setIndex(scaledIndex, device, caller);
+                        if (currentDevice) {
+                            aliasStreamState.setIndex(scaledIndex,
+                                    getDeviceForStream(streamType), caller);
                         }
                     }
                 }
@@ -4080,6 +4085,12 @@ public class AudioService extends IAudioService.Stub {
                     index = mIndexMap.get(AudioSystem.DEVICE_OUT_DEFAULT);
                 }
                 return index;
+            }
+        }
+
+        public boolean hasIndexForDevice(int device) {
+            synchronized (VolumeStreamState.class) {
+                return (mIndexMap.get(device, -1) != -1);
             }
         }
 
@@ -5380,9 +5391,11 @@ public class AudioService extends IAudioService.Stub {
             // Update speaker mute state.
             {
                 final boolean wasRestricted =
-                        prevRestrictions.getBoolean(UserManager.DISALLOW_ADJUST_VOLUME);
+                        prevRestrictions.getBoolean(UserManager.DISALLOW_ADJUST_VOLUME)
+                                || prevRestrictions.getBoolean(UserManager.DISALLLOW_UNMUTE_DEVICE);
                 final boolean isRestricted =
-                        newRestrictions.getBoolean(UserManager.DISALLOW_ADJUST_VOLUME);
+                        newRestrictions.getBoolean(UserManager.DISALLOW_ADJUST_VOLUME)
+                                || newRestrictions.getBoolean(UserManager.DISALLLOW_UNMUTE_DEVICE);
                 if (wasRestricted != isRestricted) {
                     setMasterMuteInternalNoCallerCheck(isRestricted, /* flags =*/ 0, userId);
                 }
@@ -5604,6 +5617,8 @@ public class AudioService extends IAudioService.Stub {
                 } else { // config == AudioSystem.FORCE_NONE
                     mBecomingNoisyIntentDevices |= AudioSystem.DEVICE_OUT_ALL_A2DP;
                 }
+                sendMsg(mAudioHandler, MSG_REPORT_NEW_ROUTES,
+                        SENDMSG_NOOP, 0, 0, null, 0);
                 break;
             case AudioSystem.FOR_DOCK:
                 if (config == AudioSystem.FORCE_ANALOG_DOCK) {

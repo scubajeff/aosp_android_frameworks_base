@@ -57,6 +57,7 @@ import android.os.Debug;
 import android.os.IBinder;
 import android.os.IRemoteCallback;
 import android.os.RemoteException;
+import android.os.SystemProperties;
 import android.util.ArraySet;
 import android.util.Slog;
 import android.util.SparseArray;
@@ -162,6 +163,9 @@ public class AppTransition implements Dump {
     private final WindowManagerService mService;
 
     private int mNextAppTransition = TRANSIT_UNSET;
+    private int mLastUsedAppTransition = TRANSIT_UNSET;
+    private String mLastOpeningApp;
+    private String mLastClosingApp;
 
     private static final int NEXT_TRANSIT_TYPE_NONE = 0;
     private static final int NEXT_TRANSIT_TYPE_CUSTOM = 1;
@@ -231,6 +235,8 @@ public class AppTransition implements Dump {
     private boolean mLastHadClipReveal;
     private boolean mProlongedAnimationsEnded;
 
+    private final boolean mGridLayoutRecentsEnabled;
+
     AppTransition(Context context, WindowManagerService service) {
         mContext = context;
         mService = service;
@@ -269,6 +275,7 @@ public class AppTransition implements Dump {
         };
         mClipRevealTranslationY = (int) (CLIP_REVEAL_TRANSLATION_Y_DP
                 * mContext.getResources().getDisplayMetrics().density);
+        mGridLayoutRecentsEnabled = SystemProperties.getBoolean("ro.recents.grid", false);
     }
 
     boolean isTransitionSet() {
@@ -285,6 +292,13 @@ public class AppTransition implements Dump {
 
     private void setAppTransition(int transit) {
         mNextAppTransition = transit;
+        setLastAppTransition(TRANSIT_UNSET, null, null);
+    }
+
+    void setLastAppTransition(int transit, AppWindowToken openingApp, AppWindowToken closingApp) {
+        mLastUsedAppTransition = transit;
+        mLastOpeningApp = "" + openingApp;
+        mLastClosingApp = "" + closingApp;
     }
 
     boolean isReady() {
@@ -364,6 +378,7 @@ public class AppTransition implements Dump {
 
     void goodToGo(AppWindowAnimator topOpeningAppAnimator, AppWindowAnimator topClosingAppAnimator,
             ArraySet<AppWindowToken> openingApps, ArraySet<AppWindowToken> closingApps) {
+        int appTransition = mNextAppTransition;
         mNextAppTransition = TRANSIT_UNSET;
         mAppTransitionState = APP_STATE_RUNNING;
         notifyAppTransitionStartingLocked(
@@ -372,7 +387,7 @@ public class AppTransition implements Dump {
                 topOpeningAppAnimator != null ? topOpeningAppAnimator.animation : null,
                 topClosingAppAnimator != null ? topClosingAppAnimator.animation : null);
         mService.getDefaultDisplayContentLocked().getDockedDividerController()
-                .notifyAppTransitionStarting();
+                .notifyAppTransitionStarting(openingApps, appTransition);
 
         // Prolong the start for the transition when docking a task from recents, unless recents
         // ended it already then we don't need to wait.
@@ -604,7 +619,7 @@ public class AppTransition implements Dump {
             float scaleH = mTmpRect.height() / (float) appHeight;
             Animation scale = new ScaleAnimation(scaleW, 1, scaleH, 1,
                     computePivot(mTmpRect.left, scaleW),
-                    computePivot(mTmpRect.right, scaleH));
+                    computePivot(mTmpRect.top, scaleH));
             scale.setInterpolator(mDecelerateInterpolator);
 
             Animation alpha = new AlphaAnimation(0, 1);
@@ -910,12 +925,12 @@ public class AppTransition implements Dump {
         float scaleW = appWidth / thumbWidth;
         getNextAppTransitionStartRect(taskId, mTmpRect);
         final float fromX;
-        final float fromY;
+        float fromY;
         final float toX;
-        final float toY;
+        float toY;
         final float pivotX;
         final float pivotY;
-        if (isTvUiMode(uiMode) || orientation == Configuration.ORIENTATION_PORTRAIT) {
+        if (shouldScaleDownThumbnailTransition(uiMode, orientation)) {
             fromX = mTmpRect.left;
             fromY = mTmpRect.top;
 
@@ -925,6 +940,12 @@ public class AppTransition implements Dump {
             toY = appRect.height() / 2 * (1 - 1 / scaleW) + appRect.top;
             pivotX = mTmpRect.width() / 2;
             pivotY = appRect.height() / 2 / scaleW;
+            if (mGridLayoutRecentsEnabled) {
+                // In the grid layout, the header is displayed above the thumbnail instead of
+                // overlapping it.
+                fromY -= thumbHeightI;
+                toY -= thumbHeightI * scaleW;
+            }
         } else {
             pivotX = 0;
             pivotY = 0;
@@ -973,7 +994,10 @@ public class AppTransition implements Dump {
             // This AnimationSet uses the Interpolators assigned above.
             AnimationSet set = new AnimationSet(false);
             set.addAnimation(scale);
-            set.addAnimation(alpha);
+            if (!mGridLayoutRecentsEnabled) {
+                // In the grid layout, the header should be shown for the whole animation.
+                set.addAnimation(alpha);
+            }
             set.addAnimation(translate);
             set.addAnimation(clipAnim);
             a = set;
@@ -992,7 +1016,10 @@ public class AppTransition implements Dump {
             // This AnimationSet uses the Interpolators assigned above.
             AnimationSet set = new AnimationSet(false);
             set.addAnimation(scale);
-            set.addAnimation(alpha);
+            if (!mGridLayoutRecentsEnabled) {
+                // In the grid layout, the header should be shown for the whole animation.
+                set.addAnimation(alpha);
+            }
             set.addAnimation(translate);
             a = set;
 
@@ -1057,7 +1084,7 @@ public class AppTransition implements Dump {
         final float thumbWidth = thumbWidthI > 0 ? thumbWidthI : 1;
         final int thumbHeightI = mTmpRect.height();
         final float thumbHeight = thumbHeightI > 0 ? thumbHeightI : 1;
-        final int thumbStartX = mTmpRect.left - containingFrame.left;
+        final int thumbStartX = mTmpRect.left - containingFrame.left - contentInsets.left;
         final int thumbStartY = mTmpRect.top - containingFrame.top;
 
         switch (thumbTransitState) {
@@ -1086,12 +1113,14 @@ public class AppTransition implements Dump {
                     mTmpFromClipRect.inset(contentInsets);
                     mNextAppTransitionInsets.set(contentInsets);
 
-                    if (isTvUiMode(uiMode) || orientation == Configuration.ORIENTATION_PORTRAIT) {
+                    if (shouldScaleDownThumbnailTransition(uiMode, orientation)) {
                         // We scale the width and clip to the top/left square
                         float scale = thumbWidth /
                                 (appWidth - contentInsets.left - contentInsets.right);
-                        int unscaledThumbHeight = (int) (thumbHeight / scale);
-                        mTmpFromClipRect.bottom = mTmpFromClipRect.top + unscaledThumbHeight;
+                        if (!mGridLayoutRecentsEnabled) {
+                            int unscaledThumbHeight = (int) (thumbHeight / scale);
+                            mTmpFromClipRect.bottom = mTmpFromClipRect.top + unscaledThumbHeight;
+                        }
 
                         mNextAppTransitionInsets.set(contentInsets);
 
@@ -1615,8 +1644,7 @@ public class AppTransition implements Dump {
         if (isTransitionSet()) {
             clear();
             mNextAppTransitionType = NEXT_TRANSIT_TYPE_SCALE_UP;
-            putDefaultNextAppTransitionCoordinates(startX, startY, startX + startWidth,
-                    startY + startHeight, null);
+            putDefaultNextAppTransitionCoordinates(startX, startY, startWidth, startHeight, null);
             postAnimationCallback();
         }
     }
@@ -1905,6 +1933,14 @@ public class AppTransition implements Dump {
             pw.print(prefix); pw.print("mNextAppTransitionCallback=");
                     pw.println(mNextAppTransitionCallback);
         }
+        if (mLastUsedAppTransition != TRANSIT_NONE) {
+            pw.print(prefix); pw.print("mLastUsedAppTransition=");
+                    pw.println(appTransitionToString(mLastUsedAppTransition));
+            pw.print(prefix); pw.print("mLastOpeningApp=");
+                    pw.println(mLastOpeningApp);
+            pw.print(prefix); pw.print("mLastClosingApp=");
+                    pw.println(mLastClosingApp);
+        }
     }
 
     public void setCurrentUser(int newUserId) {
@@ -1939,6 +1975,15 @@ public class AppTransition implements Dump {
             mService.mH.sendEmptyMessageDelayed(H.APP_TRANSITION_TIMEOUT, APP_TRANSITION_TIMEOUT_MS);
         }
         return prepared;
+    }
+
+    /**
+     * @return whether the transition should show the thumbnail being scaled down.
+     */
+    private boolean shouldScaleDownThumbnailTransition(int uiMode, int orientation) {
+        return isTvUiMode(uiMode)
+                || mGridLayoutRecentsEnabled
+                || orientation == Configuration.ORIENTATION_PORTRAIT;
     }
 
     /**

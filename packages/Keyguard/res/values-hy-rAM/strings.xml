@@ -46,11 +46,6 @@
     <string name="keyguard_sim_locked_message" msgid="6875773413306380902">"SIM քարտը կողպված է:"</string>
     <string name="keyguard_sim_puk_locked_message" msgid="3747232467471801633">"SIM քարտը PUK-ով կողպված է:"</string>
     <string name="keyguard_sim_unlock_progress_dialog_message" msgid="7975221805033614426">"SIM քարտը ապակողպվում է..."</string>
-    <string name="keyguard_accessibility_pattern_unlock" msgid="1490840706075246612">"Սխեմայով ապակողպում:"</string>
-    <string name="keyguard_accessibility_pin_unlock" msgid="2469687111784035046">"Pin-ն ապակողպված է:"</string>
-    <string name="keyguard_accessibility_password_unlock" msgid="7675777623912155089">"Գաղտնաբառի ապակողպում:"</string>
-    <string name="keyguard_accessibility_pattern_area" msgid="7679891324509597904">"Սխեմայի տարածք:"</string>
-    <string name="keyguard_accessibility_slide_area" msgid="6736064494019979544">"Սահեցման տարածք:"</string>
     <string name="keyguard_accessibility_pin_area" msgid="7903959476607833485">"PIN կոդի տարածք"</string>
     <string name="keyguard_accessibility_sim_pin_area" msgid="3887780775111719336">"SIM քարտի PIN կոդի տարածք"</string>
     <string name="keyguard_accessibility_sim_puk_area" msgid="1880823406954996207">"SIM քարտի PUK կոդի տարածք"</string>
@@ -84,10 +79,10 @@
     <string name="kg_failed_attempts_almost_at_wipe" product="default" msgid="1843331751334128428">"Դուք կատարել եք հեռախոսն ապակողպելու <xliff:g id="NUMBER_0">%1$d</xliff:g> անհաջող փորձ: Եվս <xliff:g id="NUMBER_1">%2$d</xliff:g> անհաջող փորձից հետո այս հեռախոսը կվերակայվի և բոլոր տվյալները կջնջվեն:"</string>
     <string name="kg_failed_attempts_now_wiping" product="tablet" msgid="258925501999698032">"Դուք կատարել եք գրասալիկն ապակողպելու <xliff:g id="NUMBER">%d</xliff:g> անհաջող փորձ: Այս պլանշետը կվերակայվի և բոլոր տվյալները կջնջվեն:"</string>
     <string name="kg_failed_attempts_now_wiping" product="default" msgid="7154028908459817066">"Դուք կատարել եք հեռախոսն ապակողպելու <xliff:g id="NUMBER">%d</xliff:g> անհաջող փորձ: Այս հեռախոսը կվերակայվի և բոլոր տվյալները կջնջվեն:"</string>
-    <string name="kg_failed_attempts_almost_at_erase_user" product="tablet" msgid="6159955099372112688">"Դուք կատարել եք գրասալիկն ապակողպելու <xliff:g id="NUMBER_0">%1$d</xliff:g> անհաջող փորձ: Եվս <xliff:g id="NUMBER_1">%2$d</xliff:g> անհաջող փորձից հետո այս օգտվողը կհեռացվի և օգտվողի բոլոր տվյալները կջնջվեն:"</string>
-    <string name="kg_failed_attempts_almost_at_erase_user" product="default" msgid="6945823186629369880">"Դուք կատարել եք հեռախոսն ապակողպելու <xliff:g id="NUMBER_0">%1$d</xliff:g> անհաջող փորձ: Եվս <xliff:g id="NUMBER_1">%2$d</xliff:g> անհաջող փորձից հետո այս օգտվողը կհեռացվի և օգտվողի բոլոր տվյալները կջնջվեն:"</string>
-    <string name="kg_failed_attempts_now_erasing_user" product="tablet" msgid="3963486905355778734">"Դուք կատարել եք գրասալիկն ապակողպելու <xliff:g id="NUMBER">%d</xliff:g> անհաջող փորձ: Օգտվողը կհեռացվի և օգտվողի բոլոր տվյալները կջնջվեն:"</string>
-    <string name="kg_failed_attempts_now_erasing_user" product="default" msgid="7729009752252111673">"Դուք կատարել եք հեռախոսն ապակողպելու <xliff:g id="NUMBER">%d</xliff:g> անհաջող փորձ: Օգտվողը կհեռացվի և օգտվողի բոլոր տվյալները կջնջվեն:"</string>
+    <string name="kg_failed_attempts_almost_at_erase_user" product="tablet" msgid="6159955099372112688">"Դուք կատարել եք գրասալիկն ապակողպելու <xliff:g id="NUMBER_0">%1$d</xliff:g> անհաջող փորձ: Եվս <xliff:g id="NUMBER_1">%2$d</xliff:g> անհաջող փորձից հետո այս օգտատերը կհեռացվի և օգտատիրոջ բոլոր տվյալները կջնջվեն:"</string>
+    <string name="kg_failed_attempts_almost_at_erase_user" product="default" msgid="6945823186629369880">"Դուք կատարել եք հեռախոսն ապակողպելու <xliff:g id="NUMBER_0">%1$d</xliff:g> անհաջող փորձ: Եվս <xliff:g id="NUMBER_1">%2$d</xliff:g> անհաջող փորձից հետո այս օգտատերը կհեռացվի և օգտատիրոջ բոլոր տվյալները կջնջվեն:"</string>
+    <string name="kg_failed_attempts_now_erasing_user" product="tablet" msgid="3963486905355778734">"Դուք կատարել եք գրասալիկն ապակողպելու <xliff:g id="NUMBER">%d</xliff:g> անհաջող փորձ: Օգտատերը կհեռացվի և օգտատիրոջ բոլոր տվյալները կջնջվեն:"</string>
+    <string name="kg_failed_attempts_now_erasing_user" product="default" msgid="7729009752252111673">"Դուք կատարել եք հեռախոսն ապակողպելու <xliff:g id="NUMBER">%d</xliff:g> անհաջող փորձ: Օգտատերը կհեռացվի և օգտատիրոջ բոլոր տվյալները կջնջվեն:"</string>
     <string name="kg_failed_attempts_almost_at_erase_profile" product="tablet" msgid="4621778507387853694">"Դուք կատարել եք գրասալիկն ապակողպելու <xliff:g id="NUMBER_0">%1$d</xliff:g> անհաջող փորձ: Եվս <xliff:g id="NUMBER_1">%2$d</xliff:g> անհաջող փորձից հետո աշխատանքային պրոֆիլը կհեռացվի և պրոֆիլի բոլոր տվյալները կջնջվեն:"</string>
     <string name="kg_failed_attempts_almost_at_erase_profile" product="default" msgid="6853071165802933545">"Դուք կատարել եք հեռախոսն ապակողպելու <xliff:g id="NUMBER_0">%1$d</xliff:g> անհաջող փորձ: Եվս <xliff:g id="NUMBER_1">%2$d</xliff:g> անհաջող փորձից հետո աշխատանքային պրոֆիլը կհեռացվի և պրոֆիլի բոլոր տվյալները կջնջվեն:"</string>
     <string name="kg_failed_attempts_now_erasing_profile" product="tablet" msgid="4686386497449912146">"Դուք կատարել եք գրասալիկն ապակողպելու <xliff:g id="NUMBER">%d</xliff:g> անհաջող փորձ: Աշխատանքային պրոֆիլը կհեռացվի և պրոֆիլի բոլոր տվյալները կջնջվեն:"</string>
@@ -109,7 +104,7 @@
     <string name="kg_pin_accepted" msgid="1448241673570020097">"Կոդն ընդունվեց:"</string>
     <string name="keyguard_carrier_default" msgid="8700650403054042153">"Ծառայություն չկա:"</string>
     <string name="accessibility_ime_switch_button" msgid="2829803408288433429">"Փոխարկել մուտքագրման եղանակը"</string>
-    <string name="airplane_mode" msgid="3122107900897202805">"Ինքնաթիռային ռեժիմ"</string>
+    <string name="airplane_mode" msgid="3122107900897202805">"Ինքնաթիռի ռեժիմ"</string>
     <string name="kg_prompt_reason_restart_pattern" msgid="5519822969283306009">"Սարքը վերագործարկելուց հետո անհրաժեշտ է մուտքագրել նախշը"</string>
     <string name="kg_prompt_reason_restart_pin" msgid="4411398237158448198">"Սարքը վերագործարկելուց հետո անհրաժեշտ է մուտքագրել PIN կոդը"</string>
     <string name="kg_prompt_reason_restart_password" msgid="6504585392626524695">"Սարքը վերագործարկելուց հետո անհրաժեշտ է մուտքագրել գաղտնաբառը"</string>

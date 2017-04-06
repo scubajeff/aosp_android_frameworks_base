@@ -25,6 +25,7 @@ import android.annotation.SdkConstant.SdkConstantType;
 import android.annotation.SystemApi;
 import android.annotation.UserIdInt;
 import android.app.Activity;
+import android.app.admin.NetworkEvent;
 import android.app.admin.SecurityLog.SecurityEvent;
 import android.content.ComponentName;
 import android.content.Context;
@@ -360,7 +361,7 @@ public class DevicePolicyManager {
      * @hide
      */
     public static final String ACTION_BUGREPORT_SHARING_ACCEPTED =
-            "com.android.server.action.BUGREPORT_SHARING_ACCEPTED";
+            "com.android.server.action.REMOTE_BUGREPORT_SHARING_ACCEPTED";
 
     /**
      * Action: Bugreport sharing with device owner has been declined by the user.
@@ -368,7 +369,7 @@ public class DevicePolicyManager {
      * @hide
      */
     public static final String ACTION_BUGREPORT_SHARING_DECLINED =
-            "com.android.server.action.BUGREPORT_SHARING_DECLINED";
+            "com.android.server.action.REMOTE_BUGREPORT_SHARING_DECLINED";
 
     /**
      * Action: Bugreport has been collected and is dispatched to {@link DevicePolicyManagerService}.
@@ -415,6 +416,14 @@ public class DevicePolicyManager {
      * @hide
      */
     public static final int NOTIFICATION_BUGREPORT_FINISHED_NOT_ACCEPTED = 3;
+
+    /**
+     * Default and maximum timeout in milliseconds after which unlocking with weak auth times out,
+     * i.e. the user has to use a strong authentication method like password, PIN or pattern.
+     *
+     * @hide
+     */
+    public static final long DEFAULT_STRONG_AUTH_TIMEOUT_MS = 72 * 60 * 60 * 1000; // 72h
 
     /**
      * A {@link android.os.Parcelable} extra of type {@link android.os.PersistableBundle} that
@@ -941,6 +950,15 @@ public class DevicePolicyManager {
             = "android.app.action.SET_NEW_PARENT_PROFILE_PASSWORD";
 
     /**
+     * Broadcast action: Tell the status bar to open the device monitoring dialog, e.g. when
+     * Network logging was enabled and the user tapped the notification.
+     * <p class="note">This is a protected intent that can only be sent by the system.</p>
+     * @hide
+     */
+    public static final String ACTION_SHOW_DEVICE_MONITORING_DIALOG
+            = "android.app.action.SHOW_DEVICE_MONITORING_DIALOG";
+
+    /**
      * Flag used by {@link #addCrossProfileIntentFilter} to allow activities in
      * the parent profile to access intents sent from the managed profile.
      * That is, when an app in the managed profile calls
@@ -1276,6 +1294,33 @@ public class DevicePolicyManager {
     public static final int PASSWORD_QUALITY_MANAGED = 0x80000;
 
     /**
+     * @hide
+     *
+     * adb shell dpm set-{device,profile}-owner will normally not allow installing an owner to
+     * a user with accounts.  {@link #ACCOUNT_FEATURE_DEVICE_OR_PROFILE_OWNER_ALLOWED}
+     * and {@link #ACCOUNT_FEATURE_DEVICE_OR_PROFILE_OWNER_DISALLOWED} are the account features
+     * used by authenticator to exempt their accounts from this:
+     *
+     * <ul>
+     *     <li>Non-test-only DO/PO still can't be installed when there are accounts.
+     *     <p>In order to make an apk test-only, add android:testOnly="true" to the
+     *     &lt;application&gt; tag in the manifest.
+     *
+     *     <li>Test-only DO/PO can be installed even when there are accounts, as long as all the
+     *     accounts have the {@link #ACCOUNT_FEATURE_DEVICE_OR_PROFILE_OWNER_ALLOWED} feature.
+     *     Some authenticators claim to have any features, so to detect it, we also check
+     *     {@link #ACCOUNT_FEATURE_DEVICE_OR_PROFILE_OWNER_DISALLOWED} and disallow installing
+     *     if any of the accounts have it.
+     * </ul>
+     */
+    public static final String ACCOUNT_FEATURE_DEVICE_OR_PROFILE_OWNER_ALLOWED =
+            "android.account.DEVICE_OR_PROFILE_OWNER_ALLOWED";
+
+    /** @hide See {@link #ACCOUNT_FEATURE_DEVICE_OR_PROFILE_OWNER_ALLOWED} */
+    public static final String ACCOUNT_FEATURE_DEVICE_OR_PROFILE_OWNER_DISALLOWED =
+            "android.account.DEVICE_OR_PROFILE_OWNER_DISALLOWED";
+
+    /**
      * Called by an application that is administering the device to set the password restrictions it
      * is imposing. After setting this, the user will not be able to enter a new password that is
      * not at least as restrictive as what has been set. Note that the current password will remain
@@ -1315,7 +1360,7 @@ public class DevicePolicyManager {
 
     /**
      * Retrieve the current minimum password quality for a particular admin or all admins that set
-     * retrictions on this user and its participating profiles. Restrictions on profiles that have
+     * restrictions on this user and its participating profiles. Restrictions on profiles that have
      * a separate challenge are not taken into account.
      *
      * <p>This method can be called on the {@link DevicePolicyManager} instance
@@ -1379,7 +1424,7 @@ public class DevicePolicyManager {
 
     /**
      * Retrieve the current minimum password length for a particular admin or all admins that set
-     * retrictions on this user and its participating profiles. Restrictions on profiles that have
+     * restrictions on this user and its participating profiles. Restrictions on profiles that have
      * a separate challenge are not taken into account.
      *
      * <p>This method can be called on the {@link DevicePolicyManager} instance
@@ -1442,7 +1487,7 @@ public class DevicePolicyManager {
 
     /**
      * Retrieve the current number of upper case letters required in the password
-     * for a particular admin or all admins that set retrictions on this user and
+     * for a particular admin or all admins that set restrictions on this user and
      * its participating profiles. Restrictions on profiles that have a separate challenge
      * are not taken into account.
      * This is the same value as set by
@@ -1511,7 +1556,7 @@ public class DevicePolicyManager {
 
     /**
      * Retrieve the current number of lower case letters required in the password
-     * for a particular admin or all admins that set retrictions on this user
+     * for a particular admin or all admins that set restrictions on this user
      * and its participating profiles. Restrictions on profiles that have
      * a separate challenge are not taken into account.
      * This is the same value as set by
@@ -1580,7 +1625,7 @@ public class DevicePolicyManager {
 
     /**
      * Retrieve the current number of letters required in the password
-     * for a particular admin or all admins that set retrictions on this user
+     * for a particular admin or all admins that set restrictions on this user
      * and its participating profiles. Restrictions on profiles that have
      * a separate challenge are not taken into account.
      * This is the same value as set by
@@ -1648,7 +1693,7 @@ public class DevicePolicyManager {
 
     /**
      * Retrieve the current number of numerical digits required in the password
-     * for a particular admin or all admins that set retrictions on this user
+     * for a particular admin or all admins that set restrictions on this user
      * and its participating profiles. Restrictions on profiles that have
      * a separate challenge are not taken into account.
      * This is the same value as set by
@@ -1716,7 +1761,7 @@ public class DevicePolicyManager {
 
     /**
      * Retrieve the current number of symbols required in the password
-     * for a particular admin or all admins that set retrictions on this user
+     * for a particular admin or all admins that set restrictions on this user
      * and its participating profiles. Restrictions on profiles that have
      * a separate challenge are not taken into account. This is the same value as
      * set by {@link #setPasswordMinimumSymbols(ComponentName, int)}
@@ -1783,7 +1828,7 @@ public class DevicePolicyManager {
 
     /**
      * Retrieve the current number of non-letter characters required in the password
-     * for a particular admin or all admins that set retrictions on this user
+     * for a particular admin or all admins that set restrictions on this user
      * and its participating profiles. Restrictions on profiles that have
      * a separate challenge are not taken into account.
      * This is the same value as set by
@@ -1915,7 +1960,7 @@ public class DevicePolicyManager {
 
     /**
      * Get the current password expiration time for a particular admin or all admins that set
-     * retrictions on this user and its participating profiles. Restrictions on profiles that have
+     * restrictions on this user and its participating profiles. Restrictions on profiles that have
      * a separate challenge are not taken into account. If admin is {@code null}, then a composite
      * of all expiration times is returned - which will be the minimum of all of them.
      *
@@ -1939,7 +1984,7 @@ public class DevicePolicyManager {
 
     /**
      * Retrieve the current password history length for a particular admin or all admins that
-     * set retrictions on this user and its participating profiles. Restrictions on profiles that
+     * set restrictions on this user and its participating profiles. Restrictions on profiles that
      * have a separate challenge are not taken into account.
      *
      * <p>This method can be called on the {@link DevicePolicyManager} instance
@@ -1981,7 +2026,8 @@ public class DevicePolicyManager {
      * Determine whether the current password the user has set is sufficient to meet the policy
      * requirements (e.g. quality, minimum length) that have been requested by the admins of this
      * user and its participating profiles. Restrictions on profiles that have a separate challenge
-     * are not taken into account.
+     * are not taken into account. If the user has a password, it must have been entered in order to
+     * perform this check.
      * <p>
      * The calling device admin must have requested
      * {@link DeviceAdminInfo#USES_POLICY_LIMIT_PASSWORD} to be able to call this method; if it has
@@ -1994,6 +2040,7 @@ public class DevicePolicyManager {
      * @return Returns true if the password meets the current requirements, else false.
      * @throws SecurityException if the calling application does not own an active administrator
      *             that uses {@link DeviceAdminInfo#USES_POLICY_LIMIT_PASSWORD}
+     * @throws IllegalStateException if the user has a password but has not entered it yet.
      */
     public boolean isActivePasswordSufficient() {
         if (mService != null) {
@@ -2121,7 +2168,7 @@ public class DevicePolicyManager {
 
     /**
      * Retrieve the current maximum number of login attempts that are allowed before the device
-     * or profile is wiped, for a particular admin or all admins that set retrictions on this user
+     * or profile is wiped, for a particular admin or all admins that set restrictions on this user
      * and its participating profiles. Restrictions on profiles that have a separate challenge are
      * not taken into account.
      *
@@ -2219,6 +2266,7 @@ public class DevicePolicyManager {
      * @throws SecurityException if the calling application does not own an active administrator
      *             that uses {@link DeviceAdminInfo#USES_POLICY_RESET_PASSWORD}
      * @throws IllegalStateException if the calling user is locked or has a managed profile.
+     * @throws IllegalArgumentException if the password does not meet system requirements.
      */
     public boolean resetPassword(String password, int flags) {
         throwIfParentInstance("resetPassword");
@@ -2262,7 +2310,7 @@ public class DevicePolicyManager {
 
     /**
      * Retrieve the current maximum time to unlock for a particular admin or all admins that set
-     * retrictions on this user and its participating profiles. Restrictions on profiles that have
+     * restrictions on this user and its participating profiles. Restrictions on profiles that have
      * a separate challenge are not taken into account.
      *
      * <p>This method can be called on the {@link DevicePolicyManager} instance
@@ -2305,6 +2353,83 @@ public class DevicePolicyManager {
             }
         }
         return 0;
+    }
+
+    /**
+     * Called by a device/profile owner to set the timeout after which unlocking with secondary, non
+     * strong auth (e.g. fingerprint, trust agents) times out, i.e. the user has to use a strong
+     * authentication method like password, pin or pattern.
+     *
+     * <p>This timeout is used internally to reset the timer to require strong auth again after
+     * specified timeout each time it has been successfully used.
+     *
+     * <p>Fingerprint can also be disabled altogether using {@link #KEYGUARD_DISABLE_FINGERPRINT}.
+     *
+     * <p>Trust agents can also be disabled altogether using {@link #KEYGUARD_DISABLE_TRUST_AGENTS}.
+     *
+     * <p>The calling device admin must be a device or profile owner. If it is not,
+     * a {@link SecurityException} will be thrown.
+     *
+     * <p>The calling device admin can verify the value it has set by calling
+     * {@link #getRequiredStrongAuthTimeout(ComponentName)} and passing in its instance.
+     *
+     * <p>This method can be called on the {@link DevicePolicyManager} instance returned by
+     * {@link #getParentProfileInstance(ComponentName)} in order to set restrictions on the parent
+     * profile.
+     *
+     * @param admin Which {@link DeviceAdminReceiver} this request is associated with.
+     * @param timeoutMs The new timeout, after which the user will have to unlock with strong
+     *         authentication method. A value of 0 means the admin is not participating in
+     *         controlling the timeout.
+     *         The minimum and maximum timeouts are platform-defined and are typically 1 hour and
+     *         72 hours, respectively. Though discouraged, the admin may choose to require strong
+     *         auth at all times using {@link #KEYGUARD_DISABLE_FINGERPRINT} and/or
+     *         {@link #KEYGUARD_DISABLE_TRUST_AGENTS}.
+     *
+     * @throws SecurityException if {@code admin} is not a device or profile owner.
+     *
+     * @hide
+     */
+    public void setRequiredStrongAuthTimeout(@NonNull ComponentName admin,
+            long timeoutMs) {
+        if (mService != null) {
+            try {
+                mService.setRequiredStrongAuthTimeout(admin, timeoutMs, mParentInstance);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+    }
+
+    /**
+     * Determine for how long the user will be able to use secondary, non strong auth for
+     * authentication, since last strong method authentication (password, pin or pattern) was used.
+     * After the returned timeout the user is required to use strong authentication method.
+     *
+     * <p>This method can be called on the {@link DevicePolicyManager} instance
+     * returned by {@link #getParentProfileInstance(ComponentName)} in order to retrieve
+     * restrictions on the parent profile.
+     *
+     * @param admin The name of the admin component to check, or {@code null} to aggregate
+     *         accross all participating admins.
+     * @return The timeout or 0 if not configured for the provided admin.
+     *
+     * @hide
+     */
+    public long getRequiredStrongAuthTimeout(@Nullable ComponentName admin) {
+        return getRequiredStrongAuthTimeout(admin, myUserId());
+    }
+
+    /** @hide per-user version */
+    public long getRequiredStrongAuthTimeout(@Nullable ComponentName admin, @UserIdInt int userId) {
+        if (mService != null) {
+            try {
+                return mService.getRequiredStrongAuthTimeout(admin, userId, mParentInstance);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+        return DEFAULT_STRONG_AUTH_TIMEOUT_MS;
     }
 
     /**
@@ -2510,6 +2635,8 @@ public class DevicePolicyManager {
     /**
      * Result code for {@link #setStorageEncryption} and {@link #getStorageEncryptionStatus}:
      * indicating that encryption is active.
+     * <p>
+     * Also see {@link #ENCRYPTION_STATUS_ACTIVE_PER_USER}.
      */
     public static final int ENCRYPTION_STATUS_ACTIVE = 3;
 
@@ -2522,7 +2649,11 @@ public class DevicePolicyManager {
 
     /**
      * Result code for {@link #getStorageEncryptionStatus}:
-     * indicating that encryption is active and the encryption key is tied to the user.
+     * indicating that encryption is active and the encryption key is tied to the user or profile.
+     * <p>
+     * This value is only returned to apps targeting API level 24 and above. For apps targeting
+     * earlier API levels, {@link #ENCRYPTION_STATUS_ACTIVE} is returned, even if the
+     * encryption key is specific to the user or profile.
      */
     public static final int ENCRYPTION_STATUS_ACTIVE_PER_USER = 5;
 
@@ -2649,7 +2780,7 @@ public class DevicePolicyManager {
     /**
      * Called by an application that is administering the device to
      * determine the current encryption status of the device.
-     *
+     * <p>
      * Depending on the returned status code, the caller may proceed in different
      * ways.  If the result is {@link #ENCRYPTION_STATUS_UNSUPPORTED}, the
      * storage system does not support encryption.  If the
@@ -2657,13 +2788,14 @@ public class DevicePolicyManager {
      * #ACTION_START_ENCRYPTION} to begin the process of encrypting or decrypting the
      * storage.  If the result is {@link #ENCRYPTION_STATUS_ACTIVE_DEFAULT_KEY}, the
      * storage system has enabled encryption but no password is set so further action
-     * may be required.  If the result is {@link #ENCRYPTION_STATUS_ACTIVATING} or
-     * {@link #ENCRYPTION_STATUS_ACTIVE}, no further action is required.
+     * may be required.  If the result is {@link #ENCRYPTION_STATUS_ACTIVATING},
+     * {@link #ENCRYPTION_STATUS_ACTIVE} or {@link #ENCRYPTION_STATUS_ACTIVE_PER_USER},
+     * no further action is required.
      *
      * @return current status of encryption. The value will be one of
      * {@link #ENCRYPTION_STATUS_UNSUPPORTED}, {@link #ENCRYPTION_STATUS_INACTIVE},
      * {@link #ENCRYPTION_STATUS_ACTIVATING}, {@link #ENCRYPTION_STATUS_ACTIVE_DEFAULT_KEY},
-     * or {@link #ENCRYPTION_STATUS_ACTIVE}.
+     * {@link #ENCRYPTION_STATUS_ACTIVE}, or {@link #ENCRYPTION_STATUS_ACTIVE_PER_USER}.
      */
     public int getStorageEncryptionStatus() {
         throwIfParentInstance("getStorageEncryptionStatus");
@@ -3341,7 +3473,7 @@ public class DevicePolicyManager {
 
     /**
      * Determine whether or not features have been disabled in keyguard either by the calling
-     * admin, if specified, or all admins that set retrictions on this user and its participating
+     * admin, if specified, or all admins that set restrictions on this user and its participating
      * profiles. Restrictions on profiles that have a separate challenge are not taken into account.
      *
      * <p>This method can be called on the {@link DevicePolicyManager} instance
@@ -3412,6 +3544,19 @@ public class DevicePolicyManager {
             try {
                 mService.setActivePasswordState(quality, length, letters, uppercase, lowercase,
                         numbers, symbols, nonletter, userHandle);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+    }
+
+    /**
+     * @hide
+     */
+    public void reportPasswordChanged(int userId) {
+        if (mService != null) {
+            try {
+                mService.reportPasswordChanged(userId);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
@@ -6416,9 +6561,154 @@ public class DevicePolicyManager {
         }
     }
 
+    /**
+     * @hide
+     * @return whether {@link android.provider.Settings.Global#DEVICE_PROVISIONED} has ever been set
+     * to 1.
+     */
+    public boolean isDeviceProvisioned() {
+        try {
+            return mService.isDeviceProvisioned();
+        } catch (RemoteException re) {
+            throw re.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * @hide
+     * Writes that the provisioning configuration has been applied.
+     */
+    public void setDeviceProvisioningConfigApplied() {
+        try {
+            mService.setDeviceProvisioningConfigApplied();
+        } catch (RemoteException re) {
+            throw re.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * @hide
+     * @return whether the provisioning configuration has been applied.
+     */
+    public boolean isDeviceProvisioningConfigApplied() {
+        try {
+            return mService.isDeviceProvisioningConfigApplied();
+        } catch (RemoteException re) {
+            throw re.rethrowFromSystemServer();
+        }
+    }
+
     private void throwIfParentInstance(String functionName) {
         if (mParentInstance) {
             throw new SecurityException(functionName + " cannot be called on the parent instance");
+        }
+    }
+
+    /**
+     * @hide
+     * Enable backup service.
+     * <p>This includes all backup and restore mechanisms.
+     * Setting this to {@code false} will make backup service no-op or return empty results.
+     *
+     * <p>There must be only one user on the device, managed by the device owner.
+     * Otherwise a {@link SecurityException} will be thrown.
+     *
+     * <p>Backup service is off by default when device owner is present.
+     */
+    public void setBackupServiceEnabled(@NonNull ComponentName admin, boolean enabled) {
+        try {
+            mService.setBackupServiceEnabled(admin, enabled);
+        } catch (RemoteException re) {
+            throw re.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * @hide
+     * @return {@code true} if backup service is enabled, {@code false} otherwise.
+     */
+    public boolean isBackupServiceEnabled(@NonNull ComponentName admin) {
+        try {
+            return mService.isBackupServiceEnabled(admin);
+        } catch (RemoteException re) {
+            throw re.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Called by a device owner to control the network logging feature. Logging can only be
+     * enabled on single user devices where the sole user is managed by the device owner. If a new
+     * user is added on the device, logging is disabled.
+     *
+     * <p> Network logs contain DNS lookup and connect() library call events.
+     *
+     * @param admin Which {@link DeviceAdminReceiver} this request is associated with.
+     * @param enabled whether network logging should be enabled or not.
+     * @throws {@link SecurityException} if {@code admin} is not a device owner.
+     * @see #retrieveNetworkLogs
+     *
+     * @hide
+     */
+    public void setNetworkLoggingEnabled(@NonNull ComponentName admin, boolean enabled) {
+        throwIfParentInstance("setNetworkLoggingEnabled");
+        try {
+            mService.setNetworkLoggingEnabled(admin, enabled);
+        } catch (RemoteException re) {
+            throw re.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Return whether network logging is enabled by a device owner.
+     *
+     * @param admin Which {@link DeviceAdminReceiver} this request is associated with. Can only
+     * be {@code null} if the caller has MANAGE_USERS permission.
+     * @return {@code true} if network logging is enabled by device owner, {@code false} otherwise.
+     * @throws {@link SecurityException} if {@code admin} is not a device owner and caller has
+     * no MANAGE_USERS permission
+     *
+     * @hide
+     */
+    public boolean isNetworkLoggingEnabled(@Nullable ComponentName admin) {
+        throwIfParentInstance("isNetworkLoggingEnabled");
+        try {
+            return mService.isNetworkLoggingEnabled(admin);
+        } catch (RemoteException re) {
+            throw re.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Called by device owner to retrieve the most recent batch of network logging events.
+     * A device owner has to provide a batchToken provided as part of
+     * {@link DeviceAdminReceiver#onNetworkLogsAvailable} callback. If the token doesn't match the
+     * token of the most recent available batch of logs, {@code null} will be returned.
+     *
+     * <p> {@link NetworkEvent} can be one of {@link DnsEvent} or {@link ConnectEvent}.
+     *
+     * <p> The list of network events is sorted chronologically, and contains at most 1200 events.
+     *
+     * <p> Access to the logs is rate limited and this method will only return a new batch of logs
+     * after the device device owner has been notified via
+     * {@link DeviceAdminReceiver#onNetworkLogsAvailable}.
+     *
+     * @param admin Which {@link DeviceAdminReceiver} this request is associated with.
+     * @param batchToken A token of the batch to retrieve
+     * @return A new batch of network logs which is a list of {@link NetworkEvent}. Returns
+     *        {@code null} if the batch represented by batchToken is no longer available or if
+     *        logging is disabled.
+     * @throws {@link SecurityException} if {@code admin} is not a device owner.
+     * @see DeviceAdminReceiver#onNetworkLogsAvailable
+     *
+     * @hide
+     */
+    public @Nullable List<NetworkEvent> retrieveNetworkLogs(@NonNull ComponentName admin,
+            long batchToken) {
+        throwIfParentInstance("retrieveNetworkLogs");
+        try {
+            return mService.retrieveNetworkLogs(admin, batchToken);
+        } catch (RemoteException re) {
+            throw re.rethrowFromSystemServer();
         }
     }
 }

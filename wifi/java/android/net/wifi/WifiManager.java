@@ -19,6 +19,7 @@ package android.net.wifi;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
 import android.annotation.SystemApi;
+import android.bluetooth.BluetoothAdapter;
 import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.DhcpInfo;
@@ -49,6 +50,8 @@ import java.util.concurrent.CountDownLatch;
  * This class provides the primary API for managing all aspects of Wi-Fi
  * connectivity. Get an instance of this class by calling
  * {@link android.content.Context#getSystemService(String) Context.getSystemService(Context.WIFI_SERVICE)}.
+ * On releases before NYC, it should only be obtained from an application context, and not from
+ * any other derived context to avoid memory leaks within the calling process.
 
  * It deals with several categories of items:
  * <ul>
@@ -561,6 +564,34 @@ public class WifiManager {
     public static final String ACTION_PICK_WIFI_NETWORK = "android.net.wifi.PICK_WIFI_NETWORK";
 
     /**
+     * Activity Action: Show UI to get user approval to enable WiFi.
+     * <p>Input: {@link android.content.Intent#EXTRA_PACKAGE_NAME} string extra with
+     *           the name of the app requesting the action.
+     * <p>Output: Nothing.
+     *
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_REQUEST_ENABLE = "android.net.wifi.action.REQUEST_ENABLE";
+
+    /**
+     * Activity Action: Show UI to get user approval to disable WiFi.
+     * <p>Input: {@link android.content.Intent#EXTRA_PACKAGE_NAME} string extra with
+     *           the name of the app requesting the action.
+     * <p>Output: Nothing.
+     *
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_REQUEST_DISABLE = "android.net.wifi.action.REQUEST_DISABLE";
+
+    /**
+     * Internally used Wi-Fi lock mode representing the case were no locks are held.
+     * @hide
+     */
+    public static final int WIFI_MODE_NO_LOCKS_HELD = 0;
+
+    /**
      * In this Wi-Fi lock mode, Wi-Fi will be kept active,
      * and will behave normally, i.e., it will attempt to automatically
      * establish a connection to a remembered access point that is
@@ -710,6 +741,15 @@ public class WifiManager {
     public List<WifiConfiguration> getConfiguredNetworks() {
         try {
             return mService.getConfiguredNetworks();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /** @hide */
+    public boolean hasCarrierConfiguredNetworks() {
+        try {
+            return mService.hasCarrierConfiguredNetworks();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -1437,7 +1477,7 @@ public class WifiManager {
      */
     public boolean setWifiEnabled(boolean enabled) {
         try {
-            return mService.setWifiEnabled(enabled);
+            return mService.setWifiEnabled(mContext.getOpPackageName(), enabled);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

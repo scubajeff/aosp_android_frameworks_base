@@ -23,6 +23,7 @@ import android.annotation.CallSuper;
 import android.annotation.DrawableRes;
 import android.annotation.IntDef;
 import android.annotation.MainThread;
+import android.annotation.NonNull;
 import android.app.ActivityManager;
 import android.app.Dialog;
 import android.content.Context;
@@ -65,6 +66,7 @@ import android.view.inputmethod.ExtractedText;
 import android.view.inputmethod.ExtractedTextRequest;
 import android.view.inputmethod.InputBinding;
 import android.view.inputmethod.InputConnection;
+import android.view.inputmethod.InputContentInfo;
 import android.view.inputmethod.InputMethod;
 import android.view.inputmethod.InputMethodManager;
 import android.view.inputmethod.InputMethodSubtype;
@@ -2368,16 +2370,16 @@ public class InputMethodService extends AbstractInputMethodService {
         }
         return true;
     }
-    
+
     /**
      * Return text that can be used as a button label for the given
      * {@link EditorInfo#imeOptions EditorInfo.imeOptions}.  Returns null
      * if there is no action requested.  Note that there is no guarantee that
      * the returned text will be relatively short, so you probably do not
      * want to use it as text on a soft keyboard key label.
-     * 
-     * @param imeOptions The value from @link EditorInfo#imeOptions EditorInfo.imeOptions}.
-     * 
+     *
+     * @param imeOptions The value from {@link EditorInfo#imeOptions EditorInfo.imeOptions}.
+     *
      * @return Returns a label to use, or null if there is no action.
      */
     public CharSequence getTextForImeAction(int imeOptions) {
@@ -2595,6 +2597,29 @@ public class InputMethodService extends AbstractInputMethodService {
      */
     public int getInputMethodWindowRecommendedHeight() {
         return mImm.getInputMethodWindowVisibleHeight();
+    }
+
+    /**
+     * Allow the receiver of {@link InputContentInfo} to obtain a temporary read-only access
+     * permission to the content.
+     *
+     * @param inputContentInfo Content to be temporarily exposed from the input method to the
+     * application.
+     * This cannot be {@code null}.
+     * @param inputConnection {@link InputConnection} with which
+     * {@link InputConnection#commitContent(InputContentInfo, Bundle)} will be called.
+     * @hide
+     */
+    @Override
+    public final void exposeContent(@NonNull InputContentInfo inputContentInfo,
+            @NonNull InputConnection inputConnection) {
+        if (inputConnection == null) {
+            return;
+        }
+        if (getCurrentInputConnection() != inputConnection) {
+            return;
+        }
+        mImm.exposeContent(mToken, inputContentInfo, getCurrentInputEditorInfo());
     }
 
     /**

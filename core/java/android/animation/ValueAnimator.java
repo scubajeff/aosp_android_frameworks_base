@@ -18,6 +18,7 @@ package android.animation;
 
 import android.annotation.CallSuper;
 import android.annotation.IntDef;
+import android.annotation.TestApi;
 import android.os.Looper;
 import android.os.Trace;
 import android.util.AndroidRuntimeException;
@@ -48,8 +49,8 @@ import java.util.HashMap;
  *
  * {@sample development/samples/ApiDemos/res/anim/animator.xml ValueAnimatorResources}
  *
- * <p>It is also possible to use a combination of {@link PropertyValuesHolder} and
- * {@link Keyframe} resource tags to create a multi-step animation.
+ * <p>Starting from API 23, it is also possible to use a combination of {@link PropertyValuesHolder}
+ * and {@link Keyframe} resource tags to create a multi-step animation.
  * Note that you can specify explicit fractional values (from 0 to 1) for
  * each keyframe to determine when, in the overall duration, the animation should arrive at that
  * value. Alternatively, you can leave the fractions off and the keyframes will be equally
@@ -261,6 +262,7 @@ public class ValueAnimator extends Animator implements AnimationHandler.Animatio
     /**
      * @hide
      */
+    @TestApi
     public static void setDurationScale(float durationScale) {
         sDurationScale = durationScale;
     }
@@ -268,6 +270,7 @@ public class ValueAnimator extends Animator implements AnimationHandler.Animatio
     /**
      * @hide
      */
+    @TestApi
     public static float getDurationScale() {
         return sDurationScale;
     }
@@ -982,6 +985,7 @@ public class ValueAnimator extends Animator implements AnimationHandler.Animatio
         mStarted = true;
         mPaused = false;
         mRunning = false;
+        mAnimationEndRequested = false;
         // Resets mLastFrameTime when start() is called, so that if the animation was running,
         // calling start() would put the animation in the
         // started-but-not-yet-reached-the-first-frame phase.

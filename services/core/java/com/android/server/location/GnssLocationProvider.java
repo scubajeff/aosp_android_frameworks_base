@@ -393,6 +393,15 @@ public class GnssLocationProvider implements LocationProviderInterface {
     // SIM/Carrier info.
     private final static String SIM_STATE_CHANGED = "android.intent.action.SIM_STATE_CHANGED";
 
+    // Persist property for LPP_PROFILE
+    private final static String LPP_PROFILE = "persist.sys.gps.lpp";
+
+    // VZW PLMN info
+    private static final String[] VzwMccMncList = {"311480", "310004", "20404"};
+    // corresponding GID1 value, empty string means ignore gid1 match.
+    private static final String[] VzwGid1List = {"", "", "BAE0000000000000"};
+
+
     private final PowerManager mPowerManager;
     private final AlarmManager mAlarmManager;
     private final PendingIntent mWakeupIntent;
@@ -407,6 +416,12 @@ public class GnssLocationProvider implements LocationProviderInterface {
     private GeofenceHardwareImpl mGeofenceHardwareImpl;
 
     private int mYearOfHardware = 0;
+
+    // Set lower than the current ITAR limit of 600m/s to allow this to trigger even if GPS HAL
+    // stops output right at 600m/s, depriving this of the information of a device that reaches
+    // greater than 600m/s, and higher than the speed of sound to avoid impacting most use cases.
+    private static final float ITAR_SPEED_LIMIT_METERS_PER_SECOND = 400.0F;
+    private boolean mItarSpeedLimitExceeded = false;
 
     private final IGnssStatusProvider mGnssStatusProvider = new IGnssStatusProvider.Stub() {
         @Override
@@ -443,8 +458,12 @@ public class GnssLocationProvider implements LocationProviderInterface {
             new ConnectivityManager.NetworkCallback() {
         @Override
         public void onAvailable(Network network) {
-            requestUtcTime();
-            xtraDownloadRequest();
+            if (mInjectNtpTimePending == STATE_PENDING_NETWORK) {
+                requestUtcTime();
+            }
+            if (mDownloadXtraDataPending == STATE_PENDING_NETWORK) {
+                xtraDownloadRequest();
+            }
         }
     };
 
@@ -507,14 +526,43 @@ public class GnssLocationProvider implements LocationProviderInterface {
         }
     };
 
+    private final boolean isVerizon(String mccMnc, String imsi, String groupId) {
+        if (DEBUG) Log.d(TAG, "simOperator: " + mccMnc);
+        if (!TextUtils.isEmpty(mccMnc) || !TextUtils.isEmpty(imsi)) {
+            for (int i = 0; i < VzwMccMncList.length; i++) {
+                if ((!TextUtils.isEmpty(mccMnc) && mccMnc.equals(VzwMccMncList[i])) ||
+                        (!TextUtils.isEmpty(imsi) && imsi.startsWith(VzwMccMncList[i]))) {
+                    // check gid too if needed
+                    if (TextUtils.isEmpty(VzwGid1List[i]) || VzwGid1List[i].equals(groupId)) {
+                        if (DEBUG) Log.d(TAG, "Verizon UICC");
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     private void subscriptionOrSimChanged(Context context) {
         if (DEBUG) Log.d(TAG, "received SIM related action: ");
         TelephonyManager phone = (TelephonyManager)
                 mContext.getSystemService(Context.TELEPHONY_SERVICE);
         String mccMnc = phone.getSimOperator();
+        String imsi = phone.getSubscriberId();
+        String groupId = phone.getGroupIdLevel1();
         if (!TextUtils.isEmpty(mccMnc)) {
             if (DEBUG) Log.d(TAG, "SIM MCC/MNC is available: " + mccMnc);
             synchronized (mLock) {
+                if (isVerizon(mccMnc, imsi, groupId)) {
+                        // load current properties for carrier VZW
+                        loadPropertiesFromResource(context, mProperties);
+                        String lpp_profile = mProperties.getProperty("LPP_PROFILE");
+                        // set the persist property LPP_PROFILE for VZW
+                        SystemProperties.set(LPP_PROFILE, lpp_profile);
+                } else {
+                        // reset the persist property for Non VZW
+                        SystemProperties.set(LPP_PROFILE, "");
+                }
                 reloadGpsProperties(context, mProperties);
                 mNIHandler.setSuplEsEnabled(mSuplEsEnabled);
             }
@@ -571,8 +619,10 @@ public class GnssLocationProvider implements LocationProviderInterface {
     private void reloadGpsProperties(Context context, Properties properties) {
         if (DEBUG) Log.d(TAG, "Reset GPS properties, previous size = " + properties.size());
         loadPropertiesFromResource(context, properties);
+
         boolean isPropertiesLoadedFromFile = false;
         final String gpsHardware = SystemProperties.get("ro.hardware.gps");
+
         if (!TextUtils.isEmpty(gpsHardware)) {
             final String propFilename =
                     PROPERTIES_FILE_PREFIX + "." + gpsHardware + PROPERTIES_FILE_SUFFIX;
@@ -583,7 +633,11 @@ public class GnssLocationProvider implements LocationProviderInterface {
             loadPropertiesFromFile(DEFAULT_PROPERTIES_FILE, properties);
         }
         if (DEBUG) Log.d(TAG, "GPS properties reloaded, size = " + properties.size());
-
+        String lpp_prof = SystemProperties.get(LPP_PROFILE);
+        if (!TextUtils.isEmpty(lpp_prof)) {
+                // override default value of this if lpp_prof is not empty
+                properties.setProperty("LPP_PROFILE", lpp_prof);
+        }
         // TODO: we should get rid of C2K specific setting.
         setSuplHostPort(properties.getProperty("SUPL_HOST"),
                         properties.getProperty("SUPL_PORT"));
@@ -958,6 +1012,11 @@ public class GnssLocationProvider implements LocationProviderInterface {
     }
 
     private void handleDownloadXtraData() {
+        if (!mSupportsXtra) {
+            // native code reports xtra not supported, don't try
+            Log.d(TAG, "handleDownloadXtraData() called when Xtra not supported");
+            return;
+        }
         if (mDownloadXtraDataPending == STATE_DOWNLOADING) {
             // already downloading data
             return;
@@ -1361,6 +1420,12 @@ public class GnssLocationProvider implements LocationProviderInterface {
             mStarted = true;
             mSingleShot = singleShot;
             mPositionMode = GPS_POSITION_MODE_STANDALONE;
+            // Notify about suppressed output, if speed limit was previously exceeded.
+            // Elsewhere, we check again with every speed output reported.
+            if (mItarSpeedLimitExceeded) {
+                Log.i(TAG, "startNavigating with ITAR limit in place. Output limited  " +
+                        "until slow enough speed reported.");
+            }
 
             boolean agpsEnabled =
                     (Settings.Global.getInt(mContext.getContentResolver(),
@@ -1447,7 +1512,17 @@ public class GnssLocationProvider implements LocationProviderInterface {
      * called from native code to update our position.
      */
     private void reportLocation(int flags, double latitude, double longitude, double altitude,
-            float speed, float bearing, float accuracy, long timestamp) {
+            float speedMetersPerSecond, float bearing, float accuracy, long timestamp) {
+        if ((flags & LOCATION_HAS_SPEED) == LOCATION_HAS_SPEED) {
+            mItarSpeedLimitExceeded = speedMetersPerSecond > ITAR_SPEED_LIMIT_METERS_PER_SECOND;
+        }
+
+        if (mItarSpeedLimitExceeded) {
+            Log.i(TAG, "Hal reported a speed in excess of ITAR limit." +
+                    "  GPS/GNSS Navigation output blocked.");
+            return;  // No output of location allowed
+        }
+
         if (VERBOSE) Log.v(TAG, "reportLocation lat: " + latitude + " long: " + longitude +
                 " timestamp: " + timestamp);
 
@@ -1467,7 +1542,7 @@ public class GnssLocationProvider implements LocationProviderInterface {
                 mLocation.removeAltitude();
             }
             if ((flags & LOCATION_HAS_SPEED) == LOCATION_HAS_SPEED) {
-                mLocation.setSpeed(speed);
+                mLocation.setSpeed(speedMetersPerSecond);
             } else {
                 mLocation.removeSpeed();
             }
@@ -1651,23 +1726,29 @@ public class GnssLocationProvider implements LocationProviderInterface {
      * called from native code to report NMEA data received
      */
     private void reportNmea(long timestamp) {
-        int length = native_read_nmea(mNmeaBuffer, mNmeaBuffer.length);
-        String nmea = new String(mNmeaBuffer, 0 /* offset */, length);
-        mListenerHelper.onNmeaReceived(timestamp, nmea);
+        if (!mItarSpeedLimitExceeded) {
+            int length = native_read_nmea(mNmeaBuffer, mNmeaBuffer.length);
+            String nmea = new String(mNmeaBuffer, 0 /* offset */, length);
+            mListenerHelper.onNmeaReceived(timestamp, nmea);
+        }
     }
 
     /**
      * called from native code - Gps measurements callback
      */
     private void reportMeasurementData(GnssMeasurementsEvent event) {
-        mGnssMeasurementsProvider.onMeasurementsAvailable(event);
+        if (!mItarSpeedLimitExceeded) {
+            mGnssMeasurementsProvider.onMeasurementsAvailable(event);
+        }
     }
 
     /**
      * called from native code - GPS navigation message callback
      */
     private void reportNavigationMessage(GnssNavigationMessage event) {
-        mGnssNavigationMessageProvider.onNavigationMessageAvailable(event);
+        if (!mItarSpeedLimitExceeded) {
+            mGnssNavigationMessageProvider.onNavigationMessageAvailable(event);
+        }
     }
 
     /**
@@ -2081,9 +2162,7 @@ public class GnssLocationProvider implements LocationProviderInterface {
                     handleInjectNtpTime();
                     break;
                 case DOWNLOAD_XTRA_DATA:
-                    if (mSupportsXtra) {
-                        handleDownloadXtraData();
-                    }
+                    handleDownloadXtraData();
                     break;
                 case INJECT_NTP_TIME_FINISHED:
                     mInjectNtpTimePending = STATE_IDLE;

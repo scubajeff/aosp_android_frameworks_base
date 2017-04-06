@@ -193,6 +193,8 @@ public class PopupWindow {
 
     private int mAnimationStyle = ANIMATION_STYLE_DEFAULT;
 
+    private int mGravity = Gravity.NO_GRAVITY;
+
     private static final int[] ABOVE_ANCHOR_STATE_SET = new int[] {
         com.android.internal.R.attr.state_above_anchor
     };
@@ -221,7 +223,7 @@ public class PopupWindow {
                         mDecorView.getLayoutParams();
 
                 updateAboveAnchor(findDropDownPosition(anchor, p, mAnchorXoff, mAnchorYoff,
-                        p.width, p.height, mAnchoredGravity));
+                        p.width, p.height, mAnchoredGravity, false));
                 update(p.x, p.y, -1, -1, true);
             }
         }
@@ -1141,14 +1143,10 @@ public class PopupWindow {
 
         mIsShowing = true;
         mIsDropdown = false;
+        mGravity = gravity;
 
         final WindowManager.LayoutParams p = createPopupLayoutParams(token);
         preparePopup(p);
-
-        // Only override the default if some gravity was specified.
-        if (gravity != Gravity.NO_GRAVITY) {
-            p.gravity = gravity;
-        }
 
         p.x = x;
         p.y = y;
@@ -1229,7 +1227,7 @@ public class PopupWindow {
         preparePopup(p);
 
         final boolean aboveAnchor = findDropDownPosition(anchor, p, xoff, yoff,
-                p.width, p.height, gravity);
+                p.width, p.height, gravity, mAllowScrollingAnchorParent);
         updateAboveAnchor(aboveAnchor);
         p.accessibilityIdOfAnchor = (anchor != null) ? anchor.getAccessibilityViewId() : -1;
 
@@ -1394,8 +1392,8 @@ public class PopupWindow {
     }
 
     private int computeGravity() {
-        int gravity = Gravity.START | Gravity.TOP;
-        if (mClipToScreen || mClippingEnabled) {
+        int gravity = mGravity == Gravity.NO_GRAVITY ?  Gravity.START | Gravity.TOP : mGravity;
+        if (mIsDropdown && (mClipToScreen || mClippingEnabled)) {
             gravity |= Gravity.DISPLAY_CLIP_VERTICAL;
         }
         return gravity;
@@ -1521,10 +1519,12 @@ public class PopupWindow {
      * @param xOffset absolute horizontal offset from the left of the anchor
      * @param yOffset absolute vertical offset from the top of the anchor
      * @param gravity horizontal gravity specifying popup alignment
+     * @param allowScroll whether the anchor view's parent may be scrolled
+     *                    when the popup window doesn't fit on screen
      * @return true if the popup is translated upwards to fit on screen
      */
     private boolean findDropDownPosition(View anchor, WindowManager.LayoutParams outParams,
-            int xOffset, int yOffset, int width, int height, int gravity) {
+            int xOffset, int yOffset, int width, int height, int gravity, boolean allowScroll) {
         final int anchorHeight = anchor.getHeight();
         final int anchorWidth = anchor.getWidth();
         if (mOverlapAnchor) {
@@ -1547,7 +1547,7 @@ public class PopupWindow {
         }
 
         // Let the window manager know to align the top to y.
-        outParams.gravity = Gravity.LEFT | Gravity.TOP;
+        outParams.gravity = computeGravity();
         outParams.width = width;
         outParams.height = height;
 
@@ -1578,7 +1578,7 @@ public class PopupWindow {
             final int scrollY = anchor.getScrollY();
             final Rect r = new Rect(scrollX, scrollY, scrollX + width + xOffset,
                     scrollY + height + anchorHeight + yOffset);
-            if (mAllowScrollingAnchorParent && anchor.requestRectangleOnScreen(r, true)) {
+            if (allowScroll && anchor.requestRectangleOnScreen(r, true)) {
                 // Reset for the new anchor position.
                 anchor.getLocationInWindow(drawingLocation);
                 outParams.x = drawingLocation[0] + xOffset;
@@ -1760,11 +1760,22 @@ public class PopupWindow {
      */
     public int getMaxAvailableHeight(
             @NonNull View anchor, int yOffset, boolean ignoreBottomDecorations) {
-        final Rect displayFrame = new Rect();
+        Rect displayFrame = null;
+        final Rect visibleDisplayFrame = new Rect();
+
+        anchor.getWindowVisibleDisplayFrame(visibleDisplayFrame);
         if (ignoreBottomDecorations) {
+            // In the ignore bottom decorations case we want to
+            // still respect all other decorations so we use the inset visible
+            // frame on the top right and left and take the bottom
+            // value from the full frame.
+            displayFrame = new Rect();
             anchor.getWindowDisplayFrame(displayFrame);
+            displayFrame.top = visibleDisplayFrame.top;
+            displayFrame.right = visibleDisplayFrame.right;
+            displayFrame.left = visibleDisplayFrame.left;
         } else {
-            anchor.getWindowVisibleDisplayFrame(displayFrame);
+            displayFrame = visibleDisplayFrame;
         }
 
         final int[] anchorPos = mTmpDrawingLocation;
@@ -1825,7 +1836,8 @@ public class PopupWindow {
         // can expect the OnAttachStateChangeListener to have been called prior
         // to executing this method, so we can rely on that instead.
         final Transition exitTransition = mExitTransition;
-        if (mIsAnchorRootAttached && exitTransition != null && decorView.isLaidOut()) {
+        if (exitTransition != null && decorView.isLaidOut()
+                && (mIsAnchorRootAttached || mAnchorRoot == null)) {
             // The decor view is non-interactive and non-IME-focusable during exit transitions.
             final LayoutParams p = (LayoutParams) decorView.getLayoutParams();
             p.flags |= LayoutParams.FLAG_NOT_TOUCHABLE;
@@ -1833,18 +1845,13 @@ public class PopupWindow {
             p.flags &= ~LayoutParams.FLAG_ALT_FOCUSABLE_IM;
             mWindowManager.updateViewLayout(decorView, p);
 
+            final View anchorRoot = mAnchorRoot != null ? mAnchorRoot.get() : null;
+            final Rect epicenter = getTransitionEpicenter();
+
             // Once we start dismissing the decor view, all state (including
             // the anchor root) needs to be moved to the decor view since we
             // may open another popup while it's busy exiting.
-            final View anchorRoot = mAnchorRoot != null ? mAnchorRoot.get() : null;
-            final Rect epicenter = getTransitionEpicenter();
-            exitTransition.setEpicenterCallback(new EpicenterCallback() {
-                @Override
-                public Rect onGetEpicenter(Transition transition) {
-                    return epicenter;
-                }
-            });
-            decorView.startExitTransition(exitTransition, anchorRoot,
+            decorView.startExitTransition(exitTransition, anchorRoot, epicenter,
                     new TransitionListenerAdapter() {
                         @Override
                         public void onTransitionEnd(Transition transition) {
@@ -2167,15 +2174,19 @@ public class PopupWindow {
         }
 
         final boolean aboveAnchor = findDropDownPosition(anchor, p, mAnchorXoff, mAnchorYoff,
-                width, height, gravity);
+                width, height, gravity, mAllowScrollingAnchorParent);
         updateAboveAnchor(aboveAnchor);
 
         final boolean paramsChanged = oldGravity != p.gravity || oldX != p.x || oldY != p.y
                 || oldWidth != p.width || oldHeight != p.height;
-        // If width and mWidth were both < 0 then we have a MATCH_PARENT/WRAP_CONTENT case.
-        // findDropDownPosition will have resolved this to absolute values,
-        // but we don't want to update mWidth/mHeight to these absolute values.
-        update(p.x, p.y, width < 0 ? width : p.width, height < 0 ? height : p.height, paramsChanged);
+
+        // If width and mWidth were both < 0 then we have a MATCH_PARENT or
+        // WRAP_CONTENT case. findDropDownPosition will have resolved this to
+        // absolute values, but we don't want to update mWidth/mHeight to these
+        // absolute values.
+        final int newWidth = width < 0 ? width : p.width;
+        final int newHeight = height < 0 ? height : p.height;
+        update(p.x, p.y, newWidth, newHeight, paramsChanged);
     }
 
     /**
@@ -2339,8 +2350,9 @@ public class PopupWindow {
          * its {@code onTransitionEnd} method called even if the transition
          * never starts; however, it may be called with a {@code null} argument.
          */
-        public void startExitTransition(Transition transition, final View anchorRoot,
-                final TransitionListener listener) {
+        public void startExitTransition(@NonNull Transition transition,
+                @Nullable final View anchorRoot, @Nullable final Rect epicenter,
+                @NonNull final TransitionListener listener) {
             if (transition == null) {
                 return;
             }
@@ -2348,23 +2360,35 @@ public class PopupWindow {
             // The anchor view's window may go away while we're executing our
             // transition, in which case we need to end the transition
             // immediately and execute the listener to remove the popup.
-            anchorRoot.addOnAttachStateChangeListener(mOnAnchorRootDetachedListener);
+            if (anchorRoot != null) {
+                anchorRoot.addOnAttachStateChangeListener(mOnAnchorRootDetachedListener);
+            }
 
             // The exit listener MUST be called for cleanup, even if the
             // transition never starts or ends. Stash it for later.
             mPendingExitListener = new TransitionListenerAdapter() {
                 @Override
-                public void onTransitionEnd(Transition transition) {
-                    anchorRoot.removeOnAttachStateChangeListener(mOnAnchorRootDetachedListener);
-                    listener.onTransitionEnd(transition);
+                public void onTransitionEnd(Transition t) {
+                    if (anchorRoot != null) {
+                        anchorRoot.removeOnAttachStateChangeListener(mOnAnchorRootDetachedListener);
+                    }
+
+                    listener.onTransitionEnd(t);
 
                     // The listener was called. Our job here is done.
                     mPendingExitListener = null;
+                    t.removeListener(this);
                 }
             };
 
             final Transition exitTransition = transition.clone();
             exitTransition.addListener(mPendingExitListener);
+            exitTransition.setEpicenterCallback(new EpicenterCallback() {
+                @Override
+                public Rect onGetEpicenter(Transition transition) {
+                    return epicenter;
+                }
+            });
 
             final int count = getChildCount();
             for (int i = 0; i < count; i++) {

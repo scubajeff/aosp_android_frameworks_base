@@ -40,6 +40,9 @@ public class ImageFloatingTextView extends TextView {
     /** Number of lines from the top to indent */
     private int mIndentLines;
 
+    /** Resolved layout direction */
+    private int mResolvedDirection = LAYOUT_DIRECTION_UNDEFINED;
+
     public ImageFloatingTextView(Context context) {
         this(context, null);
     }
@@ -68,10 +71,14 @@ public class ImageFloatingTextView extends TextView {
                 .setTextDirection(getTextDirectionHeuristic())
                 .setLineSpacing(getLineSpacingExtra(), getLineSpacingMultiplier())
                 .setIncludePad(getIncludeFontPadding())
-                .setEllipsize(shouldEllipsize ? effectiveEllipsize : null)
-                .setEllipsizedWidth(ellipsisWidth)
                 .setBreakStrategy(Layout.BREAK_STRATEGY_HIGH_QUALITY)
-                .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_FULL);
+                .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_FULL)
+                .setMaxLines(getMaxLines() >= 0 ? getMaxLines() : Integer.MAX_VALUE);
+        if (shouldEllipsize) {
+            builder.setEllipsize(effectiveEllipsize)
+                    .setEllipsizedWidth(ellipsisWidth);
+        }
+
         // we set the endmargin on the requested number of lines.
         int endMargin = getContext().getResources().getDimensionPixelSize(
                 R.dimen.notification_content_picture_margin);
@@ -82,13 +89,26 @@ public class ImageFloatingTextView extends TextView {
                 margins[i] = endMargin;
             }
         }
-        if (getLayoutDirection() == LAYOUT_DIRECTION_RTL) {
+        if (mResolvedDirection == LAYOUT_DIRECTION_RTL) {
             builder.setIndents(margins, null);
         } else {
             builder.setIndents(null, margins);
         }
 
         return builder.build();
+    }
+
+    @Override
+    public void onRtlPropertiesChanged(int layoutDirection) {
+        super.onRtlPropertiesChanged(layoutDirection);
+
+        if (layoutDirection != mResolvedDirection && isLayoutDirectionResolved()) {
+            mResolvedDirection = layoutDirection;
+            if (mIndentLines > 0) {
+                // Invalidate layout.
+                setHint(getHint());
+            }
+        }
     }
 
     @RemotableViewMethod

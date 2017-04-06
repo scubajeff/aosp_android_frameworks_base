@@ -21,6 +21,7 @@ import com.android.internal.util.Preconditions;
 
 import android.app.PendingIntent;
 import android.content.Context;
+import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import android.os.Process;
@@ -42,7 +43,7 @@ import java.util.HashMap;
  * <div class="special reference">
  * <h3>Developer Guides</h3>
  * <p>For more information about communicating with USB hardware, read the
- * <a href="{@docRoot}guide/topics/usb/index.html">USB</a> developer guide.</p>
+ * <a href="{@docRoot}guide/topics/connectivity/usb/index.html">USB developer guide</a>.</p>
  * </div>
  */
 public class UsbManager {
@@ -329,7 +330,7 @@ public class UsbManager {
             ParcelFileDescriptor pfd = mService.openDevice(deviceName);
             if (pfd != null) {
                 UsbDeviceConnection connection = new UsbDeviceConnection(device);
-                boolean result = connection.open(deviceName, pfd);
+                boolean result = connection.open(deviceName, pfd, mContext);
                 pfd.close();
                 if (result) {
                     return connection;
@@ -476,6 +477,26 @@ public class UsbManager {
     }
 
     /**
+     * Grants permission to specified package for USB device without showing system dialog.
+     * Only system components can call this function, as it requires the MANAGE_USB permission.
+     * @param device to request permissions for
+     * @param packageName of package to grant permissions
+     *
+     * {@hide}
+     */
+    public void grantPermission(UsbDevice device, String packageName) {
+        try {
+            int uid = mContext.getPackageManager()
+                .getPackageUidAsUser(packageName, mContext.getUserId());
+            mService.grantDevicePermission(device, uid);
+        } catch (NameNotFoundException e) {
+            Log.e(TAG, "Package " + packageName + " not found.", e);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Returns true if the specified USB function is currently enabled when in device mode.
      * <p>
      * USB functions represent interfaces which are published to the host to access
@@ -509,33 +530,23 @@ public class UsbManager {
      * {@link #USB_FUNCTION_MIDI}, {@link #USB_FUNCTION_MTP}, {@link #USB_FUNCTION_PTP},
      * or {@link #USB_FUNCTION_RNDIS}.
      * </p><p>
+     * Also sets whether USB data (for example, MTP exposed pictures) should be made available
+     * on the USB connection when in device mode. Unlocking usb data should only be done with
+     * user involvement, since exposing pictures or other data could leak sensitive
+     * user information.
+     * </p><p>
      * Note: This function is asynchronous and may fail silently without applying
      * the requested changes.
      * </p>
      *
      * @param function name of the USB function, or null to restore the default function
+     * @param usbDataUnlocked whether user data is accessible
      *
      * {@hide}
      */
-    public void setCurrentFunction(String function) {
+    public void setCurrentFunction(String function, boolean usbDataUnlocked) {
         try {
-            mService.setCurrentFunction(function);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
-     * Sets whether USB data (for example, MTP exposed pictures) should be made available
-     * on the USB connection when in device mode. Unlocking usb data should only be done with
-     * user involvement, since exposing pictures or other data could leak sensitive
-     * user information.
-     *
-     * {@hide}
-     */
-    public void setUsbDataUnlocked(boolean unlocked) {
-        try {
-            mService.setUsbDataUnlocked(unlocked);
+            mService.setCurrentFunction(function, usbDataUnlocked);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

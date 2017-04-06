@@ -157,7 +157,28 @@ public abstract class PackageManagerInternal {
             int deviceOwnerUserId, String deviceOwner, SparseArray<String> profileOwners);
 
     /**
-     * Whether a package's data be cleared.
+     * Returns {@code true} if a given package can't be wiped. Otherwise, returns {@code false}.
      */
-    public abstract boolean canPackageBeWiped(int userId, String packageName);
+    public abstract boolean isPackageDataProtected(int userId, String packageName);
+
+    /**
+     * Gets whether the package was ever launched.
+     * @param packageName The package name.
+     * @param userId The user for which to check.
+     * @return Whether was launched.
+     */
+    public abstract boolean wasPackageEverLaunched(String packageName, int userId);
+
+    /**
+     * Retrieve the official name associated with a user id.  This name is
+     * guaranteed to never change, though it is possible for the underlying
+     * user id to be changed.  That is, if you are storing information about
+     * user ids in persistent storage, you should use the string returned
+     * by this function instead of the raw user-id.
+     *
+     * @param uid The user id for which you would like to retrieve a name.
+     * @return Returns a unique name for the given user id, or null if the
+     * user id is not currently assigned.
+     */
+    public abstract String getNameForUid(int uid);
 }

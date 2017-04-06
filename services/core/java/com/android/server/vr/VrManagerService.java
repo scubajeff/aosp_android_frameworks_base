@@ -46,6 +46,7 @@ import android.service.vr.IVrListener;
 import android.service.vr.IVrManager;
 import android.service.vr.IVrStateCallbacks;
 import android.service.vr.VrListenerService;
+import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Slog;
@@ -85,9 +86,9 @@ import java.util.Objects;
  * {@link android.app.Activity#setVrModeEnabled)}.  An application may also implement a service to
  * be run while in VR mode by implementing {@link android.service.vr.VrListenerService}.
  *
- * @see {@link android.service.vr.VrListenerService}
- * @see {@link com.android.server.vr.VrManagerInternal}
- * @see {@link com.android.server.vr.VrStateListener}
+ * @see android.service.vr.VrListenerService
+ * @see com.android.server.vr.VrManagerInternal
+ * @see com.android.server.vr.VrStateListener
  *
  * @hide
  */
@@ -100,6 +101,14 @@ public class VrManagerService extends SystemService implements EnabledComponentC
     private static final int PENDING_STATE_DELAY_MS = 300;
     private static final int EVENT_LOG_SIZE = 32;
     private static final int INVALID_APPOPS_MODE = -1;
+    /** Null set of sleep sleep flags. */
+    private static final int FLAG_NONE = 0;
+    /** Flag set when the device is not sleeping. */
+    private static final int FLAG_AWAKE = 1;
+    /** Flag set when the screen has been turned on. */
+    private static final int FLAG_SCREEN_ON = 2;
+    /** Flag indicating that all system sleep flags have been set.*/
+    private static final int FLAG_ALL = FLAG_AWAKE | FLAG_SCREEN_ON;
 
     private static native void initializeNative();
     private static native void setVrModeNative(boolean enabled);
@@ -109,6 +118,7 @@ public class VrManagerService extends SystemService implements EnabledComponentC
     private final IBinder mOverlayToken = new Binder();
 
     // State protected by mLock
+    private boolean mVrModeAllowed;
     private boolean mVrModeEnabled;
     private EnabledComponentsObserver mComponentObserver;
     private ManagedApplicationService mCurrentVrService;
@@ -124,9 +134,63 @@ public class VrManagerService extends SystemService implements EnabledComponentC
     private VrState mPendingState;
     private final ArrayDeque<VrState> mLoggingDeque = new ArrayDeque<>(EVENT_LOG_SIZE);
     private final NotificationAccessManager mNotifAccessManager = new NotificationAccessManager();
+    /** Tracks the state of the screen and keyguard UI.*/
+    private int mSystemSleepFlags = FLAG_NONE;
 
     private static final int MSG_VR_STATE_CHANGE = 0;
     private static final int MSG_PENDING_VR_STATE_CHANGE = 1;
+
+    /**
+     * Set whether VR mode may be enabled.
+     * <p/>
+     * If VR mode is not allowed to be enabled, calls to set VR mode will be cached.  When VR mode
+     * is again allowed to be enabled, the most recent cached state will be applied.
+     *
+     * @param allowed {@code true} if calling any of the setVrMode methods may cause the device to
+     *   enter VR mode.
+     */
+    private void setVrModeAllowedLocked(boolean allowed) {
+        if (mVrModeAllowed != allowed) {
+            mVrModeAllowed = allowed;
+            Slog.i(TAG, "VR mode is " + ((allowed) ? "allowed" : "disallowed"));
+            if (mVrModeAllowed) {
+                consumeAndApplyPendingStateLocked();
+            } else {
+                // Set pending state to current state.
+                mPendingState = (mVrModeEnabled && mCurrentVrService != null)
+                    ? new VrState(mVrModeEnabled, mCurrentVrService.getComponent(),
+                        mCurrentVrService.getUserId(), mCurrentVrModeComponent)
+                    : null;
+
+                // Unbind current VR service and do necessary callbacks.
+                updateCurrentVrServiceLocked(false, null, 0, null);
+            }
+        }
+    }
+
+    private void setSleepState(boolean isAsleep) {
+        synchronized(mLock) {
+
+            if (!isAsleep) {
+                mSystemSleepFlags |= FLAG_AWAKE;
+            } else {
+                mSystemSleepFlags &= ~FLAG_AWAKE;
+            }
+
+            setVrModeAllowedLocked(mSystemSleepFlags == FLAG_ALL);
+        }
+    }
+
+    private void setScreenOn(boolean isScreenOn) {
+        synchronized(mLock) {
+            if (isScreenOn) {
+                mSystemSleepFlags |= FLAG_SCREEN_ON;
+            } else {
+                mSystemSleepFlags &= ~FLAG_SCREEN_ON;
+            }
+            setVrModeAllowedLocked(mSystemSleepFlags == FLAG_ALL);
+        }
+    }
 
     private final Handler mHandler = new Handler() {
         @Override
@@ -147,7 +211,9 @@ public class VrManagerService extends SystemService implements EnabledComponentC
                 } break;
                 case MSG_PENDING_VR_STATE_CHANGE : {
                     synchronized(mLock) {
-                        VrManagerService.this.consumeAndApplyPendingStateLocked();
+                        if (mVrModeAllowed) {
+                           VrManagerService.this.consumeAndApplyPendingStateLocked();
+                        }
                     }
                 } break;
                 default :
@@ -218,6 +284,7 @@ public class VrManagerService extends SystemService implements EnabledComponentC
                     String packageName = mNotificationAccessPackageToUserId.keyAt(i);
                     revokeNotificationListenerAccess(packageName, grantUserId);
                     revokeNotificationPolicyAccess(packageName);
+                    revokeCoarseLocationPermissionIfNeeded(packageName, grantUserId);
                     mNotificationAccessPackageToUserId.removeAt(i);
                 }
             }
@@ -226,6 +293,7 @@ public class VrManagerService extends SystemService implements EnabledComponentC
                 if (!packageNames.contains(pkg)) {
                     revokeNotificationListenerAccess(pkg, currentUserId);
                     revokeNotificationPolicyAccess(pkg);
+                    revokeCoarseLocationPermissionIfNeeded(pkg, currentUserId);
                     mNotificationAccessPackageToUserId.remove(pkg);
                 }
             }
@@ -233,6 +301,7 @@ public class VrManagerService extends SystemService implements EnabledComponentC
                 if (!allowed.contains(pkg)) {
                     grantNotificationPolicyAccess(pkg);
                     grantNotificationListenerAccess(pkg, currentUserId);
+                    grantCoarseLocationPermissionIfNeeded(pkg, currentUserId);
                     mNotificationAccessPackageToUserId.put(pkg, currentUserId);
                 }
             }
@@ -251,7 +320,6 @@ public class VrManagerService extends SystemService implements EnabledComponentC
     public void onEnabledComponentChanged() {
         synchronized (mLock) {
             int currentUser = ActivityManager.getCurrentUser();
-
             // Update listeners
             ArraySet<ComponentName> enabledListeners = mComponentObserver.getEnabled(currentUser);
 
@@ -264,12 +332,12 @@ public class VrManagerService extends SystemService implements EnabledComponentC
             }
             mNotifAccessManager.update(enabledPackages);
 
-            if (mCurrentVrService == null) {
-                return; // No active services
+            if (!mVrModeAllowed) {
+                return; // Don't do anything, we shouldn't be in VR mode.
             }
 
             // If there is a pending state change, we'd better deal with that first
-            consumeAndApplyPendingStateLocked();
+            consumeAndApplyPendingStateLocked(false);
 
             if (mCurrentVrService == null) {
                 return; // No active services
@@ -317,6 +385,7 @@ public class VrManagerService extends SystemService implements EnabledComponentC
                 return;
             }
             pw.println("********* Dump of VrManagerService *********");
+            pw.println("VR mode is currently: " + ((mVrModeAllowed) ? "allowed" : "disallowed"));
             pw.println("Previous state transitions:\n");
             String tab = "  ";
             dumpStateTransitions(pw);
@@ -370,13 +439,17 @@ public class VrManagerService extends SystemService implements EnabledComponentC
         @Override
         public void setVrMode(boolean enabled, ComponentName packageName, int userId,
                 ComponentName callingPackage) {
-            VrManagerService.this.setVrMode(enabled, packageName, userId, callingPackage, false);
+            VrManagerService.this.setVrMode(enabled, packageName, userId, callingPackage);
         }
 
         @Override
-        public void setVrModeImmediate(boolean enabled, ComponentName packageName, int userId,
-                ComponentName callingPackage) {
-            VrManagerService.this.setVrMode(enabled, packageName, userId, callingPackage, true);
+        public void onSleepStateChanged(boolean isAsleep) {
+            VrManagerService.this.setSleepState(isAsleep);
+        }
+
+        @Override
+        public void onScreenStateChanged(boolean isScreenOn) {
+            VrManagerService.this.setScreenOn(isScreenOn);
         }
 
         @Override
@@ -403,107 +476,6 @@ public class VrManagerService extends SystemService implements EnabledComponentC
 
         publishLocalService(VrManagerInternal.class, new LocalService());
         publishBinderService(VR_MANAGER_BINDER_SERVICE, mVrManager.asBinder());
-
-        // If there are no VR packages installed on the device, then disable VR
-        // components, otherwise, enable them.
-        setEnabledStatusOfVrComponents();
-    }
-
-    private void setEnabledStatusOfVrComponents() {
-        ArraySet<ComponentName> vrComponents = SystemConfig.getInstance().getDefaultVrComponents();
-        if (vrComponents == null) {
-           return;
-        }
-
-        // We only want to enable VR components if there is a VR package installed on the device.
-        // The VR components themselves do not quality as a VR package, so exclude them.
-        ArraySet<String> vrComponentPackageNames = new ArraySet<>();
-        for (ComponentName componentName : vrComponents) {
-            vrComponentPackageNames.add(componentName.getPackageName());
-        }
-
-        // Check to see if there are any packages on the device, other than the VR component
-        // packages.
-        PackageManager pm = mContext.getPackageManager();
-        List<PackageInfo> packageInfos = pm.getInstalledPackages(
-                PackageManager.GET_CONFIGURATIONS);
-        boolean vrModeIsUsed = false;
-        for (PackageInfo packageInfo : packageInfos) {
-            if (packageInfo != null && packageInfo.packageName != null &&
-                    pm.getApplicationEnabledSetting(packageInfo.packageName) ==
-                            PackageManager.COMPONENT_ENABLED_STATE_DEFAULT) {
-                vrModeIsUsed = enableVrComponentsIfVrModeUsed(pm, packageInfo,
-                        vrComponentPackageNames, vrComponents);
-                if (vrModeIsUsed) {
-                    break;
-                }
-            }
-        }
-
-        if (!vrModeIsUsed) {
-            Slog.i(TAG, "No VR packages found, disabling VR components");
-            setVrComponentsEnabledOrDisabled(vrComponents, false);
-
-            // Register to receive an intent when a new package is installed, in case that package
-            // requires VR components.
-            IntentFilter intentFilter = new IntentFilter();
-            intentFilter.addAction(Intent.ACTION_PACKAGE_ADDED);
-            intentFilter.addDataScheme("package");
-            mContext.registerReceiver(new BroadcastReceiver() {
-                @Override
-                public void onReceive(Context context, Intent intent) {
-                    PackageManager pm = context.getPackageManager();
-                    final String packageName = intent.getData().getSchemeSpecificPart();
-                    if (packageName != null) {
-                        try {
-                            PackageInfo packageInfo = pm.getPackageInfo(packageName,
-                                    PackageManager.GET_CONFIGURATIONS);
-                            enableVrComponentsIfVrModeUsed(pm, packageInfo,
-                                    vrComponentPackageNames, vrComponents);
-                        } catch (NameNotFoundException e) {
-                        }
-                    }
-                };
-            }, intentFilter);
-        }
-    }
-
-    private void setVrComponentsEnabledOrDisabled(ArraySet<ComponentName> vrComponents,
-            boolean enabled) {
-        int state = enabled ?
-                PackageManager.COMPONENT_ENABLED_STATE_ENABLED :
-                PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
-        PackageManager pm = mContext.getPackageManager();
-        for (ComponentName componentName : vrComponents) {
-            try {
-                // Note that we must first check for the existance of the package before trying
-                // to set its enabled state.  This is to prevent PackageManager from throwing
-                // an excepton if the package is not found (not just a NameNotFoundException
-                // exception).
-                PackageInfo packageInfo = pm.getPackageInfo(componentName.getPackageName(),
-                        PackageManager.GET_CONFIGURATIONS);
-                pm.setApplicationEnabledSetting(componentName.getPackageName(), state , 0);
-            } catch (NameNotFoundException e) {
-            }
-        }
-    }
-
-    private boolean enableVrComponentsIfVrModeUsed(PackageManager pm, PackageInfo packageInfo,
-            ArraySet<String> vrComponentPackageNames, ArraySet<ComponentName> vrComponents) {
-        boolean isVrComponent = vrComponents != null &&
-                vrComponentPackageNames.contains(packageInfo.packageName);
-        if (packageInfo != null && packageInfo.reqFeatures != null && !isVrComponent) {
-            for (FeatureInfo featureInfo : packageInfo.reqFeatures) {
-                if (featureInfo.name != null &&
-                    (featureInfo.name.equals(PackageManager.FEATURE_VR_MODE) ||
-                     featureInfo.name.equals(PackageManager.FEATURE_VR_MODE_HIGH_PERFORMANCE))) {
-                    Slog.i(TAG, "VR package found, enabling VR components");
-                    setVrComponentsEnabledOrDisabled(vrComponents, true);
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     @Override
@@ -520,6 +492,10 @@ public class VrManagerService extends SystemService implements EnabledComponentC
                         VrListenerService.SERVICE_INTERFACE, mLock, listeners);
 
                 mComponentObserver.rebuildAll();
+            }
+        } else if (phase == SystemService.PHASE_THIRD_PARTY_APPS_CAN_START) {
+            synchronized (mLock) {
+                mVrModeAllowed = true;
             }
         }
     }
@@ -563,12 +539,16 @@ public class VrManagerService extends SystemService implements EnabledComponentC
                     false, mOverlayToken, null, oldUserId);
         }
 
+        if (!mVrModeEnabled) {
+            return;
+        }
+
         // Apply the restrictions for the current user based on vr state
         String[] exemptions = (exemptedPackage == null) ? new String[0] :
                 new String[] { exemptedPackage };
 
         appOpsManager.setUserRestrictionForUser(AppOpsManager.OP_SYSTEM_ALERT_WINDOW,
-                mVrModeEnabled, mOverlayToken, exemptions, newUserId);
+                true, mOverlayToken, exemptions, newUserId);
     }
 
     private void updateDependentAppOpsLocked(String newVrServicePackage, int newUserId,
@@ -609,7 +589,8 @@ public class VrManagerService extends SystemService implements EnabledComponentC
 
             boolean validUserComponent = (mComponentObserver.isValid(component, userId) ==
                     EnabledComponentsObserver.NO_ERROR);
-            if (!mVrModeEnabled && !enabled) {
+            boolean goingIntoVrMode = validUserComponent && enabled;
+            if (!mVrModeEnabled && !goingIntoVrMode) {
                 return validUserComponent; // Disabled -> Disabled transition does nothing.
             }
 
@@ -617,29 +598,39 @@ public class VrManagerService extends SystemService implements EnabledComponentC
                     ? mCurrentVrService.getComponent().getPackageName() : null;
             final int oldUserId = mCurrentVrModeUser;
 
-            // Always send mode change events.
-            changeVrModeLocked(enabled);
+            // Notify system services and VR HAL of mode change.
+            changeVrModeLocked(goingIntoVrMode);
 
-            if (!enabled || !validUserComponent) {
-                // Unbind whatever is running
+            boolean nothingChanged = false;
+            if (!goingIntoVrMode) {
+                // Not going into VR mode, unbind whatever is running
                 if (mCurrentVrService != null) {
-                    Slog.i(TAG, "Disconnecting " + mCurrentVrService.getComponent() + " for user " +
-                            mCurrentVrService.getUserId());
+                    Slog.i(TAG, "Leaving VR mode, disconnecting "
+                        + mCurrentVrService.getComponent() + " for user "
+                        + mCurrentVrService.getUserId());
                     mCurrentVrService.disconnect();
                     mCurrentVrService = null;
+                } else {
+                    nothingChanged = true;
                 }
             } else {
+                // Going into VR mode
                 if (mCurrentVrService != null) {
-                    // Unbind any running service that doesn't match the component/user selection
+                    // Unbind any running service that doesn't match the latest component/user
+                    // selection.
                     if (mCurrentVrService.disconnectIfNotMatching(component, userId)) {
-                        Slog.i(TAG, "Disconnecting " + mCurrentVrService.getComponent() +
-                                " for user " + mCurrentVrService.getUserId());
+                        Slog.i(TAG, "VR mode component changed to " + component
+                            + ", disconnecting " + mCurrentVrService.getComponent()
+                            + " for user " + mCurrentVrService.getUserId());
                         createAndConnectService(component, userId);
                         sendUpdatedCaller = true;
+                    } else {
+                        nothingChanged = true;
                     }
-                    // The service with the correct component/user is bound
+                    // The service with the correct component/user is already bound, do nothing.
                 } else {
-                    // Nothing was previously running, bind a new service
+                    // Nothing was previously running, bind a new service for the latest
+                    // component/user selection.
                     createAndConnectService(component, userId);
                     sendUpdatedCaller = true;
                 }
@@ -674,7 +665,10 @@ public class VrManagerService extends SystemService implements EnabledComponentC
                     }
                 });
             }
-            logStateLocked();
+
+            if (!nothingChanged) {
+                logStateLocked();
+            }
 
             return validUserComponent;
         } finally {
@@ -744,7 +738,7 @@ public class VrManagerService extends SystemService implements EnabledComponentC
 
         for (String c : current) {
             ComponentName component = ComponentName.unflattenFromString(c);
-            if (component.getPackageName().equals(pkg)) {
+            if (component != null && component.getPackageName().equals(pkg)) {
                 toRemove.add(c);
             }
         }
@@ -755,6 +749,34 @@ public class VrManagerService extends SystemService implements EnabledComponentC
         Settings.Secure.putStringForUser(resolver,
                 Settings.Secure.ENABLED_NOTIFICATION_LISTENERS,
                 flatSettings, userId);
+    }
+
+    private void grantCoarseLocationPermissionIfNeeded(String pkg, int userId) {
+        // Don't clobber the user if permission set in current state explicitly
+        if (!isPermissionUserUpdated(Manifest.permission.ACCESS_COARSE_LOCATION, pkg, userId)) {
+            try {
+                mContext.getPackageManager().grantRuntimePermission(pkg,
+                        Manifest.permission.ACCESS_COARSE_LOCATION, new UserHandle(userId));
+            } catch (IllegalArgumentException e) {
+                // Package was removed during update.
+                Slog.w(TAG, "Could not grant coarse location permission, package " + pkg
+                    + " was removed.");
+            }
+        }
+    }
+
+    private void revokeCoarseLocationPermissionIfNeeded(String pkg, int userId) {
+        // Don't clobber the user if permission set in current state explicitly
+        if (!isPermissionUserUpdated(Manifest.permission.ACCESS_COARSE_LOCATION, pkg, userId)) {
+            try {
+                mContext.getPackageManager().revokeRuntimePermission(pkg,
+                        Manifest.permission.ACCESS_COARSE_LOCATION, new UserHandle(userId));
+            } catch (IllegalArgumentException e) {
+                // Package was removed during update.
+                Slog.w(TAG, "Could not revoke coarse location permission, package " + pkg
+                    + " was removed.");
+            }
+        }
     }
 
     private boolean isPermissionUserUpdated(String permission, String pkg, int userId) {
@@ -772,7 +794,9 @@ public class VrManagerService extends SystemService implements EnabledComponentC
         if (flat != null) {
             String[] allowed = flat.split(":");
             for (String s : allowed) {
-                current.add(s);
+                if (!TextUtils.isEmpty(s)) {
+                    current.add(s);
+                }
             }
         }
         return current;
@@ -845,12 +869,29 @@ public class VrManagerService extends SystemService implements EnabledComponentC
                 sBinderChecker);
     }
 
+    /**
+     * Apply the pending VR state. If no state is pending, disconnect any currently bound
+     * VR listener service.
+     */
     private void consumeAndApplyPendingStateLocked() {
+        consumeAndApplyPendingStateLocked(true);
+    }
+
+    /**
+     * Apply the pending VR state.
+     *
+     * @param disconnectIfNoPendingState if {@code true}, then any currently bound VR listener
+     *     service will be disconnected if no state is pending. If this is {@code false} then the
+     *     nothing will be changed when there is no pending state.
+     */
+    private void consumeAndApplyPendingStateLocked(boolean disconnectIfNoPendingState) {
         if (mPendingState != null) {
             updateCurrentVrServiceLocked(mPendingState.enabled,
                     mPendingState.targetPackageName, mPendingState.userId,
                     mPendingState.callingPackage);
             mPendingState = null;
+        } else if (disconnectIfNoPendingState) {
+            updateCurrentVrServiceLocked(false, null, 0, null);
         }
     }
 
@@ -901,13 +942,20 @@ public class VrManagerService extends SystemService implements EnabledComponentC
     /*
      * Implementation of VrManagerInternal calls.  These are callable from system services.
      */
-
     private void setVrMode(boolean enabled, @NonNull ComponentName targetPackageName,
-            int userId, @NonNull ComponentName callingPackage, boolean immediate) {
+            int userId, @NonNull ComponentName callingPackage) {
 
         synchronized (mLock) {
+            VrState pending = new VrState(enabled, targetPackageName, userId, callingPackage);
+            if (!mVrModeAllowed) {
+                // We're not allowed to be in VR mode.  Make this state pending.  This will be
+                // applied the next time we are allowed to enter VR mode unless it is superseded by
+                // another call.
+                mPendingState = pending;
+                return;
+            }
 
-            if (!enabled && mCurrentVrService != null && !immediate) {
+            if (!enabled && mCurrentVrService != null) {
                 // If we're transitioning out of VR mode, delay briefly to avoid expensive HAL calls
                 // and service bind/unbind in case we are immediately switching to another VR app.
                 if (mPendingState == null) {
@@ -915,7 +963,7 @@ public class VrManagerService extends SystemService implements EnabledComponentC
                             PENDING_STATE_DELAY_MS);
                 }
 
-                mPendingState = new VrState(enabled, targetPackageName, userId, callingPackage);
+                mPendingState = pending;
                 return;
             } else {
                 mHandler.removeMessages(MSG_PENDING_VR_STATE_CHANGE);

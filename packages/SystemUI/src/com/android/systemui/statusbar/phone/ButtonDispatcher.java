@@ -14,11 +14,10 @@
 
 package com.android.systemui.statusbar.phone;
 
+import android.annotation.DrawableRes;
+import android.annotation.Nullable;
 import android.graphics.drawable.Drawable;
 import android.view.View;
-import android.widget.ImageView;
-
-import com.android.systemui.statusbar.policy.KeyButtonView;
 
 import java.util.ArrayList;
 
@@ -41,6 +40,7 @@ public class ButtonDispatcher {
     private int mImageResource = -1;
     private Drawable mImageDrawable;
     private View mCurrentView;
+    private boolean mVertical;
 
     public ButtonDispatcher(int id) {
         mId = id;
@@ -65,9 +65,13 @@ public class ButtonDispatcher {
             view.setVisibility(mVisibility);
         }
         if (mImageResource > 0) {
-            ((ImageView) view).setImageResource(mImageResource);
+            ((ButtonInterface) view).setImageResource(mImageResource);
         } else if (mImageDrawable != null) {
-            ((ImageView) view).setImageDrawable(mImageDrawable);
+            ((ButtonInterface) view).setImageDrawable(mImageDrawable);
+        }
+
+        if (view instanceof  ButtonInterface) {
+            ((ButtonInterface) view).setVertical(mVertical);
         }
     }
 
@@ -88,7 +92,7 @@ public class ButtonDispatcher {
         mImageResource = -1;
         final int N = mViews.size();
         for (int i = 0; i < N; i++) {
-            ((ImageView) mViews.get(i)).setImageDrawable(mImageDrawable);
+            ((ButtonInterface) mViews.get(i)).setImageDrawable(mImageDrawable);
         }
     }
 
@@ -97,7 +101,7 @@ public class ButtonDispatcher {
         mImageDrawable = null;
         final int N = mViews.size();
         for (int i = 0; i < N; i++) {
-            ((ImageView) mViews.get(i)).setImageResource(mImageResource);
+            ((ButtonInterface) mViews.get(i)).setImageResource(mImageResource);
         }
     }
 
@@ -114,7 +118,7 @@ public class ButtonDispatcher {
         // This seems to be an instantaneous thing, so not going to persist it.
         final int N = mViews.size();
         for (int i = 0; i < N; i++) {
-            ((KeyButtonView) mViews.get(i)).abortCurrentGesture();
+            ((ButtonInterface) mViews.get(i)).abortCurrentGesture();
         }
     }
 
@@ -158,11 +162,51 @@ public class ButtonDispatcher {
         }
     }
 
+    public ArrayList<View> getViews() {
+        return mViews;
+    }
+
     public View getCurrentView() {
         return mCurrentView;
     }
 
     public void setCurrentView(View currentView) {
         mCurrentView = currentView.findViewById(mId);
+    }
+
+    public void setCarMode(boolean carMode) {
+        final int N = mViews.size();
+        for (int i = 0; i < N; i++) {
+            final View view = mViews.get(i);
+            if (view instanceof ButtonInterface) {
+                ((ButtonInterface) view).setCarMode(carMode);
+            }
+        }
+    }
+
+    public void setVertical(boolean vertical) {
+        mVertical = vertical;
+        final int N = mViews.size();
+        for (int i = 0; i < N; i++) {
+            final View view = mViews.get(i);
+            if (view instanceof ButtonInterface) {
+                ((ButtonInterface) view).setVertical(vertical);
+            }
+        }
+    }
+
+    /**
+     * Interface for button actions.
+     */
+    public interface ButtonInterface {
+        void setImageResource(@DrawableRes int resId);
+
+        void setImageDrawable(@Nullable Drawable drawable);
+
+        void abortCurrentGesture();
+
+        void setVertical(boolean vertical);
+
+        void setCarMode(boolean carMode);
     }
 }

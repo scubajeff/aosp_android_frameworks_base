@@ -244,6 +244,11 @@ public class DecorCaptionView extends ViewGroup implements View.OnTouchListener,
         return mTouchDispatchList;
     }
 
+    @Override
+    public boolean shouldDelayChildPressedState() {
+        return false;
+    }
+
     private boolean passedSlop(int x, int y) {
         return Math.abs(x - mTouchDownX) > mDragSlop || Math.abs(y - mTouchDownY) > mDragSlop;
     }
@@ -411,7 +416,8 @@ public class DecorCaptionView extends ViewGroup implements View.OnTouchListener,
         if (mClickTarget == mMaximize) {
             maximizeWindow();
         } else if (mClickTarget == mClose) {
-            mOwner.dispatchOnWindowDismissed(true /*finishTask*/);
+            mOwner.dispatchOnWindowDismissed(
+                    true /*finishTask*/, false /*suppressWindowTransition*/);
         }
         return true;
     }

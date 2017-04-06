@@ -38,6 +38,7 @@ import com.android.systemui.statusbar.notification.HybridGroupManager;
 import com.android.systemui.statusbar.notification.HybridNotificationView;
 import com.android.systemui.statusbar.notification.NotificationUtils;
 import com.android.systemui.statusbar.notification.NotificationViewWrapper;
+import com.android.systemui.statusbar.notification.VisualStabilityManager;
 import com.android.systemui.statusbar.phone.NotificationPanelView;
 
 import java.util.ArrayList;
@@ -123,8 +124,10 @@ public class NotificationChildrenContainer extends ViewGroup {
             mDividers.get(i).layout(0, 0, getWidth(), mDividerHeight);
         }
         if (mOverflowNumber != null) {
-            mOverflowNumber.layout(getWidth() - mOverflowNumber.getMeasuredWidth(), 0, getWidth(),
-                    mOverflowNumber.getMeasuredHeight());
+            boolean isRtl = getLayoutDirection() == LAYOUT_DIRECTION_RTL;
+            int left = (isRtl ? 0 : getWidth() - mOverflowNumber.getMeasuredWidth());
+            int right = left + mOverflowNumber.getMeasuredWidth();
+            mOverflowNumber.layout(left, 0, right, mOverflowNumber.getMeasuredHeight());
         }
         if (mNotificationHeader != null) {
             mNotificationHeader.layout(0, 0, mNotificationHeader.getMeasuredWidth(),
@@ -313,9 +316,13 @@ public class NotificationChildrenContainer extends ViewGroup {
      * Apply the order given in the list to the children.
      *
      * @param childOrder the new list order
+     * @param visualStabilityManager
+     * @param callback
      * @return whether the list order has changed
      */
-    public boolean applyChildOrder(List<ExpandableNotificationRow> childOrder) {
+    public boolean applyChildOrder(List<ExpandableNotificationRow> childOrder,
+            VisualStabilityManager visualStabilityManager,
+            VisualStabilityManager.Callback callback) {
         if (childOrder == null) {
             return false;
         }
@@ -324,9 +331,13 @@ public class NotificationChildrenContainer extends ViewGroup {
             ExpandableNotificationRow child = mChildren.get(i);
             ExpandableNotificationRow desiredChild = childOrder.get(i);
             if (child != desiredChild) {
-                mChildren.remove(desiredChild);
-                mChildren.add(i, desiredChild);
-                result = true;
+                if (visualStabilityManager.canReorderNotification(desiredChild)) {
+                    mChildren.remove(desiredChild);
+                    mChildren.add(i, desiredChild);
+                    result = true;
+                } else {
+                    visualStabilityManager.addReorderingAllowedCallback(callback);
+                }
             }
         }
         updateExpansionStates();
@@ -482,6 +493,7 @@ public class NotificationChildrenContainer extends ViewGroup {
             }
             childState.location = parentState.location;
             yPosition += intrinsicHeight;
+
         }
         if (mOverflowNumber != null) {
             ExpandableNotificationRow overflowView = mChildren.get(Math.min(

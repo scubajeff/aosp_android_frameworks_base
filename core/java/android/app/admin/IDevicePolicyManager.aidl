@@ -17,6 +17,7 @@
 
 package android.app.admin;
 
+import android.app.admin.NetworkEvent;
 import android.app.admin.SystemUpdatePolicy;
 import android.content.ComponentName;
 import android.content.Intent;
@@ -82,6 +83,9 @@ interface IDevicePolicyManager {
     long getMaximumTimeToLock(in ComponentName who, int userHandle, boolean parent);
     long getMaximumTimeToLockForUserAndProfiles(int userHandle);
 
+    void setRequiredStrongAuthTimeout(in ComponentName who, long timeMs, boolean parent);
+    long getRequiredStrongAuthTimeout(in ComponentName who, int userId, boolean parent);
+
     void lockNow(boolean parent);
 
     void wipeData(int flags);
@@ -116,6 +120,7 @@ interface IDevicePolicyManager {
 
     void setActivePasswordState(int quality, int length, int letters, int uppercase, int lowercase,
         int numbers, int symbols, int nonletter, int userHandle);
+    void reportPasswordChanged(int userId);
     void reportFailedPasswordAttempt(int userHandle);
     void reportSuccessfulPasswordAttempt(int userHandle);
     void reportFailedFingerprintAttempt(int userHandle);
@@ -301,4 +306,15 @@ interface IDevicePolicyManager {
 
     boolean isUninstallInQueue(String packageName);
     void uninstallPackageWithActiveAdmins(String packageName);
+
+    boolean isDeviceProvisioned();
+    boolean isDeviceProvisioningConfigApplied();
+    void setDeviceProvisioningConfigApplied();
+
+    void setBackupServiceEnabled(in ComponentName admin, boolean enabled);
+    boolean isBackupServiceEnabled(in ComponentName admin);
+
+    void setNetworkLoggingEnabled(in ComponentName admin, boolean enabled);
+    boolean isNetworkLoggingEnabled(in ComponentName admin);
+    List<NetworkEvent> retrieveNetworkLogs(in ComponentName admin, long batchToken);
 }

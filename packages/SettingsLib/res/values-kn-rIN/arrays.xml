@@ -51,7 +51,7 @@
   <string-array name="hdcp_checking_titles">
     <item msgid="441827799230089869">"ಎಂದಿಗೂ ಪರಿಶೀಲಿಸದಿರು"</item>
     <item msgid="6042769699089883931">"DRM ವಿಷಯಗಳಿಗಾಗಿ ಮಾತ್ರ ಪರಿಶೀಲಿಸಿ"</item>
-    <item msgid="9174900380056846820">"ಯಾವಾಗಲೂ ಪರಿಶೀಲಿಸು"</item>
+    <item msgid="9174900380056846820">"ಯಾವಾಗಲೂ ಪರಿಶೀಲಿಸಿ"</item>
   </string-array>
   <string-array name="hdcp_checking_summaries">
     <item msgid="505558545611516707">"HDCP ಪರಿಶೀಲನೆಯನ್ನು ಎಂದಿಗೂ ಬಳಸದಿರು"</item>
@@ -79,6 +79,18 @@
     <item msgid="1314234299552254621">"ಪ್ರತಿ ಲಾಗ್ ಬಫರ್‌ಗೆ 1M"</item>
     <item msgid="3606047780792894151">"ಪ್ರತಿ ಲಾಗ್ ಬಫರ್‌ಗೆ 4M"</item>
     <item msgid="5431354956856655120">"ಪ್ರತಿ ಲಾಗ್ ಬಫರ್‌ಗೆ 16M"</item>
+  </string-array>
+  <string-array name="select_logpersist_titles">
+    <item msgid="1744840221860799971">"ಆಫ್"</item>
+    <item msgid="3054662377365844197">"ಎಲ್ಲಾ"</item>
+    <item msgid="688870735111627832">"ಎಲ್ಲಾ ಆದರೆ ರೇಡಿಯೊ"</item>
+    <item msgid="2850427388488887328">"ಕೆರ್ನಲ್ ಮಾತ್ರ"</item>
+  </string-array>
+  <string-array name="select_logpersist_summaries">
+    <item msgid="2216470072500521830">"ಆಫ್ ಆಗಿದೆ"</item>
+    <item msgid="172978079776521897">"ಎಲ್ಲಾ ಲಾಗ್ ಬಫರ್‌ಗಳು"</item>
+    <item msgid="3873873912383879240">"ಎಲ್ಲಾ ಆದರೆ ರೇಡಿಯೊ ಲಾಗ್ ಬಫರ್‌ಗಳು"</item>
+    <item msgid="8489661142527693381">"ಕೆರ್ನಲ್ ಲಾಗ್ ಬಫರ್ ಮಾತ್ರ"</item>
   </string-array>
   <string-array name="window_animation_scale_entries">
     <item msgid="8134156599370824081">"ಆನಿಮೇಶನ್ ಆಫ್"</item>

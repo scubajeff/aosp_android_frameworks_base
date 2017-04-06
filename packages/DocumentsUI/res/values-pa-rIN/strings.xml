@@ -16,7 +16,7 @@
 
 <resources xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
-    <string name="app_label" msgid="2783841764617238354">"ਦਸਤਾਵੇਜ਼"</string>
+    <string name="app_label" msgid="1551050262492398204">"ਫ਼ਾਈਲਾਂ"</string>
     <string name="downloads_label" msgid="959113951084633612">"ਡਾਊਨਲੋਡ"</string>
     <string name="title_open" msgid="4353228937663917801">"ਤੋਂ ਖੋਲ੍ਹੋ"</string>
     <string name="title_save" msgid="2433679664882857999">"ਇਸ ਵਿੱਚ ਰੱਖਿਅਤ ਕਰੋ"</string>
@@ -112,7 +112,7 @@
     <string name="notification_copy_files_converted_title" msgid="3153573223054275181">"ਕੁਝ ਫ਼ਾਈਲਾਂ ਤਬਦੀਲ ਕੀਤੀਆਂ ਗਈਆਂ ਸਨ"</string>
     <string name="open_external_dialog_request" msgid="5789329484285817629">"ਕੀ <xliff:g id="APPNAME"><b>^1</b></xliff:g> ਨੂੰ <xliff:g id="STORAGE"><i>^3</i></xliff:g> \'ਤੇ <xliff:g id="DIRECTORY"><i>^2</i></xliff:g> ਡਾਇਰੈਕਟਰੀ \'ਤੇ ਪਹੁੰਚ ਦੇਣੀ ਹੈ?"</string>
     <string name="open_external_dialog_request_primary_volume" msgid="6635562535713428688">"ਕੀ <xliff:g id="APPNAME"><b>^1</b></xliff:g> ਨੂੰ <xliff:g id="DIRECTORY"><i>^2</i></xliff:g> ਡਾਇਰੈਕਟਰੀ \'ਤੇ ਪਹੁੰਚ ਦੇਣੀ ਹੈ?"</string>
-    <string name="open_external_dialog_root_request" msgid="8899108702926347720">"ਕੀ <xliff:g id="APPNAME"><b>^1</b></xliff:g> ਨੂੰ <xliff:g id="STORAGE"><i>^2</i></xliff:g> \'ਤੇ ਫੋਟੋਆਂ ਅਤੇ ਵੀਡੀਓ ਸਮੇਤ, ਤੁਹਾਡੇ ਡੈਟੇ \'ਤੇ ਪਹੁੰਚ ਦੇਣੀ ਹੈ?"</string>
+    <string name="open_external_dialog_root_request" msgid="8899108702926347720">"ਕੀ <xliff:g id="APPNAME"><b>^1</b></xliff:g> ਨੂੰ <xliff:g id="STORAGE"><i>^2</i></xliff:g> \'ਤੇ ਫ਼ੋਟੋਆਂ ਅਤੇ ਵੀਡੀਓ ਸਮੇਤ, ਤੁਹਾਡੇ ਡੈਟੇ \'ਤੇ ਪਹੁੰਚ ਦੇਣੀ ਹੈ?"</string>
     <string name="never_ask_again" msgid="4295278542972859268">"ਦੁਬਾਰਾ ਨਾ ਪੁੱਛੋ"</string>
     <string name="allow" msgid="7225948811296386551">"ਆਗਿਆ ਦਿਓ"</string>
     <string name="deny" msgid="2081879885755434506">"ਅਸਵੀਕਾਰ ਕਰੋ"</string>

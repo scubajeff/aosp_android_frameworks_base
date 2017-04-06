@@ -17,15 +17,6 @@
 package android.telecom;
 
 import android.annotation.SystemApi;
-import android.content.ComponentName;
-import android.content.Context;
-import android.content.pm.PackageManager;
-import android.content.res.Resources.NotFoundException;
-import android.graphics.Bitmap;
-import android.graphics.Color;
-import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.ColorDrawable;
-import android.graphics.drawable.Drawable;
 import android.graphics.drawable.Icon;
 import android.net.Uri;
 import android.os.Bundle;
@@ -37,7 +28,6 @@ import java.lang.String;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.MissingResourceException;
 
 /**
  * Represents a distinct method to place or receive a phone call. Apps which can place calls and
@@ -217,18 +207,22 @@ public final class PhoneAccount implements Parcelable {
     private final CharSequence mLabel;
     private final CharSequence mShortDescription;
     private final List<String> mSupportedUriSchemes;
+    private final int mSupportedAudioRoutes;
     private final Icon mIcon;
     private final Bundle mExtras;
     private boolean mIsEnabled;
+    private String mGroupId;
 
     /**
      * Helper class for creating a {@link PhoneAccount}.
      */
     public static class Builder {
+
         private PhoneAccountHandle mAccountHandle;
         private Uri mAddress;
         private Uri mSubscriptionAddress;
         private int mCapabilities;
+        private int mSupportedAudioRoutes = CallAudioState.ROUTE_ALL;
         private int mHighlightColor = NO_HIGHLIGHT_COLOR;
         private CharSequence mLabel;
         private CharSequence mShortDescription;
@@ -236,6 +230,7 @@ public final class PhoneAccount implements Parcelable {
         private Icon mIcon;
         private Bundle mExtras;
         private boolean mIsEnabled = false;
+        private String mGroupId = "";
 
         /**
          * Creates a builder with the specified {@link PhoneAccountHandle} and label.
@@ -263,6 +258,8 @@ public final class PhoneAccount implements Parcelable {
             mIcon = phoneAccount.getIcon();
             mIsEnabled = phoneAccount.isEnabled();
             mExtras = phoneAccount.getExtras();
+            mGroupId = phoneAccount.getGroupId();
+            mSupportedAudioRoutes = phoneAccount.getSupportedAudioRoutes();
         }
 
         /**
@@ -387,6 +384,39 @@ public final class PhoneAccount implements Parcelable {
         }
 
         /**
+         * Sets the group Id of the {@link PhoneAccount}. When a new {@link PhoneAccount} is
+         * registered to Telecom, it will replace another {@link PhoneAccount} that is already
+         * registered in Telecom and take on the current user defaults and enabled status. There can
+         * only be one {@link PhoneAccount} with a non-empty group number registered to Telecom at a
+         * time. By default, there is no group Id for a {@link PhoneAccount} (an empty String). Only
+         * grouped {@link PhoneAccount}s with the same {@link ConnectionService} can be replaced.
+         * @param groupId The group Id of the {@link PhoneAccount} that will replace any other
+         * registered {@link PhoneAccount} in Telecom with the same Group Id.
+         * @return The builder
+         * @hide
+         */
+        public Builder setGroupId(String groupId) {
+            if (groupId != null) {
+                mGroupId = groupId;
+            } else {
+                mGroupId = "";
+            }
+            return this;
+        }
+
+        /**
+         * Sets the audio routes supported by this {@link PhoneAccount}.
+         *
+         * @param routes bit mask of available routes.
+         * @return The builder.
+         * @hide
+         */
+        public Builder setSupportedAudioRoutes(int routes) {
+            mSupportedAudioRoutes = routes;
+            return this;
+        }
+
+        /**
          * Creates an instance of a {@link PhoneAccount} based on the current builder settings.
          *
          * @return The {@link PhoneAccount}.
@@ -408,7 +438,9 @@ public final class PhoneAccount implements Parcelable {
                     mShortDescription,
                     mSupportedUriSchemes,
                     mExtras,
-                    mIsEnabled);
+                    mSupportedAudioRoutes,
+                    mIsEnabled,
+                    mGroupId);
         }
     }
 
@@ -423,7 +455,9 @@ public final class PhoneAccount implements Parcelable {
             CharSequence shortDescription,
             List<String> supportedUriSchemes,
             Bundle extras,
-            boolean isEnabled) {
+            int supportedAudioRoutes,
+            boolean isEnabled,
+            String groupId) {
         mAccountHandle = account;
         mAddress = address;
         mSubscriptionAddress = subscriptionAddress;
@@ -434,7 +468,9 @@ public final class PhoneAccount implements Parcelable {
         mShortDescription = shortDescription;
         mSupportedUriSchemes = Collections.unmodifiableList(supportedUriSchemes);
         mExtras = extras;
+        mSupportedAudioRoutes = supportedAudioRoutes;
         mIsEnabled = isEnabled;
+        mGroupId = groupId;
     }
 
     public static Builder builder(
@@ -506,6 +542,17 @@ public final class PhoneAccount implements Parcelable {
     }
 
     /**
+     * Determines if this {@code PhoneAccount} has routes specified by the passed in bit mask.
+     *
+     * @param route The routes to check.
+     * @return {@code true} if the phone account has the routes.
+     * @hide
+     */
+    public boolean hasAudioRoutes(int routes) {
+        return (mSupportedAudioRoutes & routes) == routes;
+    }
+
+    /**
      * A short label describing a {@code PhoneAccount}.
      *
      * @return A label for this {@code PhoneAccount}.
@@ -545,6 +592,15 @@ public final class PhoneAccount implements Parcelable {
     }
 
     /**
+     * The audio routes supported by this {@code PhoneAccount}.
+     *
+     * @hide
+     */
+    public int getSupportedAudioRoutes() {
+        return mSupportedAudioRoutes;
+    }
+
+    /**
      * The icon to represent this {@code PhoneAccount}.
      *
      * @return The icon.
@@ -561,6 +617,21 @@ public final class PhoneAccount implements Parcelable {
      */
     public boolean isEnabled() {
         return mIsEnabled;
+    }
+
+    /**
+     * A non-empty {@link String} representing the group that A {@link PhoneAccount} is in or an
+     * empty {@link String} if the {@link PhoneAccount} is not in a group. If this
+     * {@link PhoneAccount} is in a group, this new {@link PhoneAccount} will replace a registered
+     * {@link PhoneAccount} that is in the same group. When the {@link PhoneAccount} is replaced,
+     * its user defined defaults and enabled status will also pass to this new {@link PhoneAccount}.
+     * Only {@link PhoneAccount}s that share the same {@link ConnectionService} can be replaced.
+     *
+     * @return A non-empty String Id if this {@link PhoneAccount} belongs to a group.
+     * @hide
+     */
+    public String getGroupId() {
+        return mGroupId;
     }
 
     /**
@@ -644,6 +715,8 @@ public final class PhoneAccount implements Parcelable {
         }
         out.writeByte((byte) (mIsEnabled ? 1 : 0));
         out.writeBundle(mExtras);
+        out.writeString(mGroupId);
+        out.writeInt(mSupportedAudioRoutes);
     }
 
     public static final Creator<PhoneAccount> CREATOR
@@ -687,6 +760,8 @@ public final class PhoneAccount implements Parcelable {
         }
         mIsEnabled = in.readByte() == 1;
         mExtras = in.readBundle();
+        mGroupId = in.readString();
+        mSupportedAudioRoutes = in.readInt();
     }
 
     @Override
@@ -696,7 +771,9 @@ public final class PhoneAccount implements Parcelable {
                 .append("] PhoneAccount: ")
                 .append(mAccountHandle)
                 .append(" Capabilities: ")
-                .append(capabilitiesToString(mCapabilities))
+                .append(capabilitiesToString())
+                .append(" Audio Routes: ")
+                .append(audioRoutesToString())
                 .append(" Schemes: ");
         for (String scheme : mSupportedUriSchemes) {
             sb.append(scheme)
@@ -704,6 +781,8 @@ public final class PhoneAccount implements Parcelable {
         }
         sb.append(" Extras: ");
         sb.append(mExtras);
+        sb.append(" GroupId: ");
+        sb.append(Log.pii(mGroupId));
         sb.append("]");
         return sb.toString();
     }
@@ -714,7 +793,7 @@ public final class PhoneAccount implements Parcelable {
      * @param capabilities The capabilities bitmask.
      * @return String representation of the capabilities bitmask.
      */
-    private String capabilitiesToString(int capabilities) {
+    private String capabilitiesToString() {
         StringBuilder sb = new StringBuilder();
         if (hasCapabilities(CAPABILITY_VIDEO_CALLING)) {
             sb.append("Video ");
@@ -746,6 +825,25 @@ public final class PhoneAccount implements Parcelable {
         if (hasCapabilities(CAPABILITY_SIM_SUBSCRIPTION)) {
             sb.append("SimSub ");
         }
+        return sb.toString();
+    }
+
+    private String audioRoutesToString() {
+        StringBuilder sb = new StringBuilder();
+
+        if (hasAudioRoutes(CallAudioState.ROUTE_BLUETOOTH)) {
+            sb.append("B");
+        }
+        if (hasAudioRoutes(CallAudioState.ROUTE_EARPIECE)) {
+            sb.append("E");
+        }
+        if (hasAudioRoutes(CallAudioState.ROUTE_SPEAKER)) {
+            sb.append("S");
+        }
+        if (hasAudioRoutes(CallAudioState.ROUTE_WIRED_HEADSET)) {
+            sb.append("W");
+        }
+
         return sb.toString();
     }
 }

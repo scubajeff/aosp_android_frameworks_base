@@ -8,16 +8,18 @@ LOCAL_AIDL_INCLUDES := system/netd/server/binder
 
 LOCAL_SRC_FILES += \
     $(call all-java-files-under,java) \
+    $(call all-proto-files-under, proto) \
     java/com/android/server/EventLogTags.logtags \
     java/com/android/server/am/EventLogTags.logtags \
     ../../../../system/netd/server/binder/android/net/INetd.aidl \
-    ../../../../system/netd/server/binder/android/net/metrics/IDnsEventListener.aidl \
+    ../../../../system/netd/server/binder/android/net/metrics/INetdEventListener.aidl \
 
 LOCAL_AIDL_INCLUDES += \
     system/netd/server/binder
 
 LOCAL_JAVA_LIBRARIES := services.net telephony-common
 LOCAL_STATIC_JAVA_LIBRARIES := tzdata_update
+LOCAL_PROTOC_OPTIMIZE_TYPE := nano
 
 ifneq ($(INCREMENTAL_BUILDS),)
     LOCAL_PROGUARD_ENABLED := disabled

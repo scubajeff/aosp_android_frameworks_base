@@ -2744,6 +2744,7 @@ public class AudioManager {
      * to be notified.
      * Use {@link AudioManager#getActiveRecordingConfigurations()} to query the current
      * configuration.
+     * @see AudioRecordingConfiguration
      */
     public static abstract class AudioRecordingCallback {
         /**
@@ -2850,6 +2851,7 @@ public class AudioManager {
      * Returns the current active audio recording configurations of the device.
      * @return a non-null list of recording configurations. An empty list indicates there is
      *     no recording active when queried.
+     * @see AudioRecordingConfiguration
      */
     public @NonNull List<AudioRecordingConfiguration> getActiveRecordingConfigurations() {
         final IAudioService service = getService();
@@ -3287,7 +3289,10 @@ public class AudioManager {
 
     /**
      * Used as a key for {@link #getProperty} to request the native or optimal output sample rate
-     * for this device's primary output stream, in decimal Hz.
+     * for this device's low latency output stream, in decimal Hz.  Latency-sensitive apps
+     * should use this value as a default, and offer the user the option to override it.
+     * The low latency output stream is typically either the device's primary output stream,
+     * or another output stream with smaller buffers.
      */
     // FIXME Deprecate
     public static final String PROPERTY_OUTPUT_SAMPLE_RATE =
@@ -3295,7 +3300,10 @@ public class AudioManager {
 
     /**
      * Used as a key for {@link #getProperty} to request the native or optimal output buffer size
-     * for this device's primary output stream, in decimal PCM frames.
+     * for this device's low latency output stream, in decimal PCM frames.  Latency-sensitive apps
+     * should use this value as a minimum, and offer the user the option to override it.
+     * The low latency output stream is typically either the device's primary output stream,
+     * or another output stream with smaller buffers.
      */
     // FIXME Deprecate
     public static final String PROPERTY_OUTPUT_FRAMES_PER_BUFFER =
@@ -3894,7 +3902,9 @@ public class AudioManager {
      * currently connected to the system and meeting the criteria specified in the
      * <code>flags</code> parameter.
      * @param flags A set of bitflags specifying the criteria to test.
-     * @see {@link GET_DEVICES_OUTPUTS}, {@link GET_DEVICES_INPUTS} and {@link GET_DEVICES_ALL}.
+     * @see #GET_DEVICES_OUTPUTS
+     * @see #GET_DEVICES_INPUTS
+     * @see #GET_DEVICES_ALL
      * @return A (possibly zero-length) array of AudioDeviceInfo objects.
      */
     public AudioDeviceInfo[] getDevices(int flags) {
@@ -3965,7 +3975,9 @@ public class AudioManager {
      * parameter.
      * This is an internal function. The public API front is getDevices(int).
      * @param flags A set of bitflags specifying the criteria to test.
-     * @see {@link GET_DEVICES_OUTPUTS}, {@link GET_DEVICES_INPUTS} and {@link GET_DEVICES_ALL}.
+     * @see #GET_DEVICES_OUTPUTS
+     * @see #GET_DEVICES_INPUTS
+     * @see #GET_DEVICES_ALL
      * @return A (possibly zero-length) array of AudioDeviceInfo objects.
      * @hide
      */
@@ -4011,7 +4023,7 @@ public class AudioManager {
      * Unregisters an {@link AudioDeviceCallback} object which has been previously registered
      * to receive notifications of changes to the set of connected audio devices.
      * @param callback The {@link AudioDeviceCallback} object that was previously registered
-     * with {@link AudioManager#registerAudioDeviceCallback) to be unregistered.
+     * with {@link AudioManager#registerAudioDeviceCallback} to be unregistered.
      */
     public void unregisterAudioDeviceCallback(AudioDeviceCallback callback) {
         synchronized (mDeviceCallbacks) {

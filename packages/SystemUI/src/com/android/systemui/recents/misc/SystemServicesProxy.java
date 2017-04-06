@@ -69,6 +69,7 @@ import android.util.MutableBoolean;
 import android.view.Display;
 import android.view.IAppTransitionAnimationSpecsFuture;
 import android.view.IDockedStackListener;
+import android.view.IWindowManager;
 import android.view.WindowManager;
 import android.view.WindowManager.KeyboardShortcutsReceiver;
 import android.view.WindowManagerGlobal;
@@ -77,6 +78,7 @@ import android.view.accessibility.AccessibilityManager;
 import com.android.internal.app.AssistUtils;
 import com.android.internal.os.BackgroundThread;
 import com.android.systemui.R;
+import com.android.systemui.recents.Recents;
 import com.android.systemui.recents.RecentsDebugFlags;
 import com.android.systemui.recents.RecentsImpl;
 import com.android.systemui.recents.model.Task;
@@ -120,6 +122,7 @@ public class SystemServicesProxy {
     IPackageManager mIpm;
     AssistUtils mAssistUtils;
     WindowManager mWm;
+    IWindowManager mIwm;
     UserManager mUm;
     Display mDisplay;
     String mRecentsPackage;
@@ -207,6 +210,7 @@ public class SystemServicesProxy {
         mIpm = AppGlobals.getPackageManager();
         mAssistUtils = new AssistUtils(context);
         mWm = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+        mIwm = WindowManagerGlobal.getWindowManagerService();
         mUm = UserManager.get(context);
         mDisplay = mWm.getDefaultDisplay();
         mRecentsPackage = context.getPackageName();
@@ -243,6 +247,9 @@ public class SystemServicesProxy {
         if (uiModeManager.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION) {
             Collections.addAll(sRecentsBlacklist,
                     res.getStringArray(R.array.recents_tv_blacklist_array));
+        } else {
+            Collections.addAll(sRecentsBlacklist,
+                    res.getStringArray(R.array.recents_blacklist_array));
         }
     }
 
@@ -258,6 +265,13 @@ public class SystemServicesProxy {
             sSystemServicesProxy = new SystemServicesProxy(context);
         }
         return sSystemServicesProxy;
+    }
+
+    /**
+     * @return whether the provided {@param className} is blacklisted
+     */
+    public boolean isBlackListedActivity(String className) {
+        return sRecentsBlacklist.contains(className);
     }
 
     /**
@@ -400,8 +414,7 @@ public class SystemServicesProxy {
             }
             return (homeStackVisibleNotOccluded && topActivity != null
                     && topActivity.getPackageName().equals(RecentsImpl.RECENTS_PACKAGE)
-                    && (topActivity.getClassName().equals(RecentsImpl.RECENTS_ACTIVITY)
-                        || topActivity.getClassName().equals(RecentsTvImpl.RECENTS_TV_ACTIVITY)));
+                    && Recents.RECENTS_ACTIVITIES.contains(topActivity.getClassName()));
         } catch (RemoteException e) {
             e.printStackTrace();
         }
@@ -1078,6 +1091,28 @@ public class SystemServicesProxy {
                             scaleUp);
         } catch (RemoteException e) {
             Log.w(TAG, "Failed to override transition: " + e);
+        }
+    }
+
+    /**
+     * Updates the visibility of recents.
+     */
+    public void setRecentsVisibility(boolean visible) {
+        try {
+            mIwm.setRecentsVisibility(visible);
+        } catch (RemoteException e) {
+            Log.e(TAG, "Unable to reach window manager", e);
+        }
+    }
+
+    /**
+     * Updates the visibility of the picture-in-picture.
+     */
+    public void setTvPipVisibility(boolean visible) {
+        try {
+            mIwm.setTvPipVisibility(visible);
+        } catch (RemoteException e) {
+            Log.e(TAG, "Unable to reach window manager", e);
         }
     }
 
