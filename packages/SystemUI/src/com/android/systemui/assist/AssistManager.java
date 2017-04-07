@@ -128,7 +128,9 @@ public class AssistManager {
     }
 
     public void startAssist(Bundle args) {
+//+++
         onConfigurationChanged();
+//===
         final ComponentName assistComponent = getAssistInfo();
         if (assistComponent == null) {
             return;

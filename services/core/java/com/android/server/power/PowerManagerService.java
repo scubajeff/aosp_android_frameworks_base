@@ -803,9 +803,6 @@ public final class PowerManagerService extends SystemService
         mScreenBrightnessModeSetting = Settings.System.getIntForUser(resolver,
                 Settings.System.SCREEN_BRIGHTNESS_MODE,
                 Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL, UserHandle.USER_CURRENT);
-
-        mBrightnessUseTwilight = Settings.Secure.getIntForUser(resolver,
-                Secure.BRIGHTNESS_USE_TWILIGHT, 0, UserHandle.USER_CURRENT) != 0;
         mScreenColortoneSetting = Settings.System.getIntForUser(resolver,
                 Settings.System.SCREEN_COLORTONE,
                 Settings.System.SCREEN_COLORTONE_AUTO, UserHandle.USER_CURRENT);
