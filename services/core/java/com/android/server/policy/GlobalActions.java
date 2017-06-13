@@ -108,8 +108,8 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
     private static final String GLOBAL_ACTION_KEY_ASSIST = "assist";
 //+++
     private static final String GLOBAL_ACTION_KEY_RECOVERY = "recovery";
+    private static final String GLOBAL_ACTION_KEY_REBOOT = "reboot";
 //===
-    private static final String GLOBAL_ACTION_KEY_RESTART = "restart";
 
     private final Context mContext;
     private final WindowManagerFuncs mWindowManagerFuncs;
@@ -308,8 +308,8 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
                 mItems.add(getVoiceAssistAction());
             } else if (GLOBAL_ACTION_KEY_ASSIST.equals(actionKey)) {
                 mItems.add(getAssistAction());
-            } else if (GLOBAL_ACTION_KEY_RESTART.equals(actionKey)) {
-                mItems.add(new RestartAction());
+            } else if (GLOBAL_ACTION_KEY_REBOOT.equals(actionKey)) {
+                mItems.add(new RebootAction());
 //+++
             } else if (GLOBAL_ACTION_KEY_RECOVERY.equals(actionKey)) {
                 mItems.add(new RecoveryAction());
@@ -389,9 +389,9 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
         }
     }
 
-    private final class RestartAction extends SinglePressAction implements LongPressAction {
-        private RestartAction() {
-            super(R.drawable.ic_restart, R.string.global_action_restart);
+    private final class RebootAction extends SinglePressAction implements LongPressAction {
+        private RebootAction() {
+            super(R.drawable.ic_restart, R.string.global_action_reboot);
         }
 
         @Override
@@ -423,8 +423,7 @@ class GlobalActions implements DialogInterface.OnDismissListener, DialogInterfac
 
     private final class RecoveryAction extends SinglePressAction implements LongPressAction {
         private RecoveryAction() {
-            super(com.android.internal.R.drawable.ic_lock_reboot,
-                R.string.global_action_recovery);
+            super(R.drawable.ic_restart, R.string.global_action_recovery);
         }
 
         @Override
